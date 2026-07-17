@@ -1,0 +1,164 @@
+/* VEPA v3 — Application Styles */
+/* Neon-noir aesthetic, dark theme */
+
+:root {
+  --bg-primary: #0a0a12;
+  --bg-secondary: #0d0d1a;
+  --bg-panel: #0a0a14;
+  --border-color: #1a1a2e;
+  --text-primary: #88aacc;
+  --text-secondary: #667788;
+  --text-accent: #aabbcc;
+  --physics: #4488ff;
+  --biology: #44cc44;
+  --chemistry: #cc44cc;
+  --thermo: #ff8844;
+  --meta: #ff4444;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: monospace;
+}
+
+#app {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+
+#sidebar {
+  width: 260px;
+  min-width: 260px;
+  height: 100%;
+  overflow-y: auto;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  z-index: 100;
+}
+
+#sidebar::-webkit-scrollbar {
+  width: 4px;
+}
+#sidebar::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+#sidebar::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 2px;
+}
+
+#canvas-container {
+  flex: 1;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+#canvas-container canvas {
+  display: block;
+}
+
+/* HUD overlay */
+#hud {
+  position: fixed;
+  bottom: 10px;
+  right: 10px;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+/* UI Panel styles */
+.ui-panel:first-child {
+  border-top: 1px solid var(--border-color);
+}
+
+.ui-panel-header:hover {
+  background: #111122;
+}
+
+/* Law category body */
+.law-category-body {
+  padding: 4px 0 4px 12px;
+  border-left: 2px solid rgba(255,255,255,0.05);
+  margin-left: 4px;
+}
+
+/* Input overrides */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 3px;
+  background: #1a1a2e;
+  border-radius: 2px;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #4488ff;
+  margin-top: -3.5px;
+}
+
+input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border: 1px solid #445566;
+  border-radius: 2px;
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+input[type="checkbox"]:checked {
+  background: #4488ff;
+  border-color: #4488ff;
+}
+
+select {
+  background: #111122;
+  color: #88aacc;
+  border: 1px solid #1a1a2e;
+  border-radius: 2px;
+  padding: 1px 2px;
+  font-size: 10px;
+}
+
+button:hover {
+  filter: brightness(1.3);
+}
+
+/* Loading state */
+#loading {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 14px;
+  z-index: 9999;
+  transition: opacity 0.5s;
+}
+
+#loading.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
