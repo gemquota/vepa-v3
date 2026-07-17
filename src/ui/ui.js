@@ -14,6 +14,8 @@ class UI {
     this.container = document.getElementById('sidebar');
     this.hudContainer = document.getElementById('hud');
     this.panels = {};
+    this._speciesLaws = {};
+    this._speciesParams = {};
   }
 
   init() {
@@ -142,17 +144,130 @@ class UI {
       section.style.marginBottom = '12px';
 
       const header = document.createElement('div');
-      header.style.cssText = `color:#88aacc;font:bold 11px monospace;margin-bottom:4px;`;
-      header.textContent = species.name;
+      header.style.cssText = `color:#88aacc;font:bold 11px monospace;margin-bottom:4px;display:flex;align-items:center;gap:6px;`;
+      const colorDot = document.createElement('span');
+      const col = species.color || { r: 0.5, g: 0.5, b: 0.5 };
+      colorDot.style.cssText = `display:inline-block;width:8px;height:8px;border-radius:50%;background:rgb(${col.r*255|0},${col.g*255|0},${col.b*255|0});`;
+      header.appendChild(colorDot);
+      header.append(species.name + ' (#' + species.id + ')');
       section.appendChild(header);
 
+      // ── Species Law Overrides ──
+      const lawOverrideHeader = document.createElement('div');
+      lawOverrideHeader.style.cssText = 'color:#ff8844;font:9px monospace;cursor:pointer;margin:2px 0;';
+      lawOverrideHeader.textContent = 'Law Overrides [+]';
+      section.appendChild(lawOverrideHeader);
+
+      const lawOverrideBody = document.createElement('div');
+      lawOverrideBody.style.display = 'none';
+      lawOverrideBody.style.cssText = 'padding-left:4px;margin-bottom:6px;';
+
+      // Show key law toggles for this species
+      const keyLaws = ['GRAV','DRAG','COLL','PREDATION','LIFE','AFFINITY','GLOW','BOND'];
+      for (const lawName of keyLaws) {
+        const idx = LAW_INDEXES[lawName];
+        if (idx === undefined) continue;
+        const toggleDiv = document.createElement('label');
+        toggleDiv.style.cssText = 'display:flex;align-items:center;gap:4px;font:9px monospace;cursor:pointer;padding:1px 0;';
+
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = this._speciesLawOverride(species.id, idx, true);
+        cb.style.accentColor = '#ff8844';
+        cb.onchange = () => {
+          // Store override in a map — speciesLaws[speciesId][lawIndex] = boolean
+          if (!this._speciesLaws) this._speciesLaws = {};
+          if (!this._speciesLaws[species.id]) this._speciesLaws[species.id] = {};
+          this._speciesLaws[species.id][idx] = cb.checked;
+          this.engine.bus.emit('species:lawChanged', { speciesId: species.id, lawIndex: idx, enabled: cb.checked });
+        };
+
+        const lbl = document.createElement('span');
+        lbl.textContent = lawName.toLowerCase();
+        toggleDiv.appendChild(cb);
+        toggleDiv.appendChild(lbl);
+        lawOverrideBody.appendChild(toggleDiv);
+      }
+
+      lawOverrideHeader.onclick = () => {
+        const isOpen = lawOverrideBody.style.display !== 'none';
+        lawOverrideBody.style.display = isOpen ? 'none' : 'block';
+        lawOverrideHeader.textContent = 'Law Overrides [' + (isOpen ? '+' : '−') + ']';
+      };
+
+      section.appendChild(lawOverrideBody);
+
+      // ── Species Parameters (extra per-species params beyond DNA) ──
+      const speciesParamHeader = document.createElement('div');
+      speciesParamHeader.style.cssText = 'color:#44cc44;font:9px monospace;cursor:pointer;margin:2px 0;';
+      speciesParamHeader.textContent = 'Species Params [+]';
+      section.appendChild(speciesParamHeader);
+
+      const speciesParamBody = document.createElement('div');
+      speciesParamBody.style.display = 'none';
+      speciesParamBody.style.cssText = 'padding-left:4px;margin-bottom:6px;';
+
+      // Species-level parameters (outside DNA)
+      const speciesParams = [
+        { key: 'populationCap', label: 'Pop Cap', min: 10, max: 5000, step: 10, default: 500 },
+        { key: 'spawnRate', label: 'Spawn Rate', min: 0, max: 10, step: 0.1, default: 1 },
+        { key: 'colorShift', label: 'Color Shift', min: -180, max: 180, step: 5, default: 0 },
+        { key: 'aggroRange', label: 'Aggro Range', min: 0, max: 500, step: 10, default: 100 },
+      ];
+
+      for (const p of speciesParams) {
+        if (!this._speciesParams) this._speciesParams = {};
+        if (!this._speciesParams[species.id]) this._speciesParams[species.id] = {};
+        const val = this._speciesParams[species.id][p.key] ?? p.default;
+
+        const div = document.createElement('div');
+        div.style.cssText = 'display:flex;align-items:center;gap:4px;font:9px monospace;padding:1px 0;';
+
+        const lbl = document.createElement('span');
+        lbl.style.cssText = 'width:55px;overflow:hidden;text-overflow:ellipsis;color:#667788;';
+        lbl.textContent = p.label;
+        div.appendChild(lbl);
+
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.min = p.min;
+        slider.max = p.max;
+        slider.step = p.step;
+        slider.value = val;
+        slider.style.cssText = 'flex:1;height:2px;accent-color:#44cc44;';
+
+        const display = document.createElement('span');
+        display.style.cssText = 'width:30px;text-align:right;color:#8899aa;';
+        display.textContent = val;
+
+        slider.oninput = () => {
+          const v = Number(slider.value);
+          this._speciesParams[species.id][p.key] = v;
+          display.textContent = v;
+          this.engine.bus.emit('species:paramChanged', { speciesId: species.id, key: p.key, value: v });
+        };
+
+        div.appendChild(slider);
+        div.appendChild(display);
+        speciesParamBody.appendChild(div);
+      }
+
+      speciesParamHeader.onclick = () => {
+        const isOpen = speciesParamBody.style.display !== 'none';
+        speciesParamBody.style.display = isOpen ? 'none' : 'block';
+        speciesParamHeader.textContent = 'Species Params [' + (isOpen ? '+' : '−') + ']';
+      };
+
+      section.appendChild(speciesParamBody);
+
+      // ── DNA Parameters ──
       for (const group of DNA_GROUPS) {
         const groupDiv = document.createElement('div');
-        groupDiv.style.cssText = 'padding-left:8px;margin-bottom:6px;';
+        groupDiv.style.cssText = 'padding-left:4px;margin-bottom:4px;';
 
         const groupHeader = document.createElement('div');
         groupHeader.style.cssText = 'color:#667788;font:9px monospace;cursor:pointer;';
-        groupHeader.textContent = group.name;
+        groupHeader.textContent = group.name + ' [+]';
         groupDiv.appendChild(groupHeader);
 
         const groupBody = document.createElement('div');
@@ -166,7 +281,9 @@ class UI {
         }
 
         groupHeader.onclick = () => {
-          groupBody.style.display = groupBody.style.display === 'none' ? 'block' : 'none';
+          const isOpen = groupBody.style.display !== 'none';
+          groupBody.style.display = isOpen ? 'none' : 'block';
+          groupHeader.textContent = group.name + ' [' + (isOpen ? '+' : '−') + ']';
         };
 
         groupDiv.appendChild(groupBody);
@@ -175,6 +292,14 @@ class UI {
 
       this._speciesContainer.appendChild(section);
     }
+  }
+
+  /** Check species law override (falls back to global law state) */
+  _speciesLawOverride(speciesId, lawIndex, globalDefault) {
+    if (this._speciesLaws && this._speciesLaws[speciesId] && this._speciesLaws[speciesId][lawIndex] !== undefined) {
+      return this._speciesLaws[speciesId][lawIndex];
+    }
+    return globalDefault;
   }
 
   _createDnaSlider(speciesId, paramIdx, range, currentValue) {
@@ -211,14 +336,13 @@ class UI {
   }
 
   _buildEnvironmentPanel() {
-    const panel = this._createPanel('Environment', 'env-panel', false);
+    const panel = this._createPanel('World', 'env-panel', true);
 
-    const addSlider = (label, min, max, step, value, onChange) => {
+    const addSlider = (label, key, min, max, step, color = '#ff8844') => {
       const div = document.createElement('div');
       div.style.cssText = 'display:flex;align-items:center;gap:4px;font:10px monospace;padding:2px 0;';
-
       const lbl = document.createElement('span');
-      lbl.style.cssText = 'width:60px;color:#8899aa;';
+      lbl.style.cssText = 'width:55px;overflow:hidden;text-overflow:ellipsis;color:#8899aa;';
       lbl.textContent = label;
       div.appendChild(lbl);
 
@@ -227,17 +351,21 @@ class UI {
       slider.min = min;
       slider.max = max;
       slider.step = step;
-      slider.value = value;
-      slider.style.cssText = 'flex:1;height:3px;accent-color:#ff8844;';
+      slider.value = this.engine.config[key] ?? 0;
+      slider.style.cssText = `flex:1;height:3px;accent-color:${color};`;
 
       const display = document.createElement('span');
       display.style.cssText = 'width:30px;text-align:right;color:#aabbcc;';
-      display.textContent = value;
+      // Format display value
+      const val = this.engine.config[key] ?? 0;
+      display.textContent = val >= 100 ? Math.round(val).toString() : val.toFixed(val < 0.1 ? 4 : 2);
 
       slider.oninput = () => {
-        const val = Number(slider.value);
-        display.textContent = val;
-        onChange(val);
+        const v = Number(slider.value);
+        this.engine.config[key] = v;
+        display.textContent = v >= 100 ? Math.round(v).toString() : v.toFixed(v < 0.1 ? 4 : 2);
+        if (key === 'worldSize') this.engine.grid.setWorldSize(v);
+        this.engine.bus.emit('world:paramChanged', { key, value: v });
       };
 
       div.appendChild(slider);
@@ -245,25 +373,59 @@ class UI {
       return div;
     };
 
-    panel.content.appendChild(
-      addSlider('Particles', 10, 5000, 10, this.engine.config.particleCount, (v) => {
-        this.engine.config.particleCount = v;
-      })
-    );
+    // World laws section
+    const lawsHeader = document.createElement('div');
+    lawsHeader.style.cssText = 'color:#ff8844;font:bold 10px/1.4 monospace;margin:4px 0 2px;';
+    lawsHeader.textContent = 'World Laws';
+    panel.content.appendChild(lawsHeader);
 
-    panel.content.appendChild(
-      addSlider('World Size', 200, 2000, 50, this.engine.config.worldSize, (v) => {
-        this.engine.config.worldSize = v;
-        this.engine.grid.setWorldSize(v);
-      })
-    );
+    panel.content.appendChild(addSlider('Gravity', 'gravityStrength', 0, 200000, 1000, '#4488ff'));
+    panel.content.appendChild(addSlider('Drag', 'dragCoeff', 0, 0.1, 0.001, '#4488ff'));
+    panel.content.appendChild(addSlider('Collision', 'collisionStiffness', 0, 2, 0.1, '#4488ff'));
+    panel.content.appendChild(addSlider('Signal', 'signalScale', 0, 2, 0.1, '#44cc44'));
 
-    // Reset button
+    const paramsHeader = document.createElement('div');
+    paramsHeader.style.cssText = 'color:#ff8844;font:bold 10px/1.4 monospace;margin:6px 0 2px;';
+    paramsHeader.textContent = 'World Parameters';
+    panel.content.appendChild(paramsHeader);
+
+    panel.content.appendChild(addSlider('Temperature', 'temperature', 0, 1, 0.01, '#ff8844'));
+    panel.content.appendChild(addSlider('Pressure', 'pressure', 0, 1, 0.01, '#ff8844'));
+    panel.content.appendChild(addSlider('Entropy', 'entropy', 0, 1, 0.01, '#ff4488'));
+    panel.content.appendChild(addSlider('Time Scale', 'timeScale', 0, 5, 0.1, '#ff8844'));
+
+    const spawnHeader = document.createElement('div');
+    spawnHeader.style.cssText = 'color:#ff8844;font:bold 10px/1.4 monospace;margin:6px 0 2px;';
+    spawnHeader.textContent = 'Spawn';
+    panel.content.appendChild(spawnHeader);
+
+    panel.content.appendChild(addSlider('Count', 'particleCount', 10, 5000, 10));
+    panel.content.appendChild(addSlider('World Size', 'worldSize', 200, 2000, 50));
+
+    // Reset + Camera Reset buttons
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:4px;margin-top:8px;';
+
     const resetBtn = document.createElement('button');
     resetBtn.textContent = 'Reset Sim';
-    resetBtn.style.cssText = 'margin-top:8px;width:100%;padding:4px;font:11px monospace;background:#442222;color:#ff6666;border:1px solid #664444;border-radius:3px;cursor:pointer;';
+    resetBtn.style.cssText = 'flex:1;padding:4px;font:11px monospace;background:#442222;color:#ff6666;border:1px solid #664444;border-radius:3px;cursor:pointer;';
     resetBtn.onclick = () => this.engine.bus.emit('ui:reset');
-    panel.content.appendChild(resetBtn);
+
+    const camBtn = document.createElement('button');
+    camBtn.textContent = 'Reset Camera';
+    camBtn.style.cssText = 'flex:1;padding:4px;font:11px monospace;background:#222244;color:#6688ff;border:1px solid #444466;border-radius:3px;cursor:pointer;';
+    camBtn.onclick = () => {
+      if (this.engine.renderer) {
+        this.engine.renderer.camera.x = this.engine.renderer.width / 2;
+        this.engine.renderer.camera.y = this.engine.renderer.height / 2;
+        this.engine.renderer.camera.zoom = 1;
+        this.engine.renderer.camera.rotation = 0;
+      }
+    };
+
+    btnRow.appendChild(resetBtn);
+    btnRow.appendChild(camBtn);
+    panel.content.appendChild(btnRow);
   }
 
   _buildPresetPanel() {
@@ -283,7 +445,8 @@ class UI {
 
   _buildInfoPanel() {
     const panel = this._createPanel('Info', 'info-panel', false);
-    panel.content.innerHTML = '<div style="font:10px/1.4 monospace;color:#667788">VEPA v3<br>Vector Emergent Physics Automata<br><br>Toggle laws to modify particle behavior. Adjust DNA sliders per species.</div>';
+    panel.content.innerHTML = '<div style="font:10px/1.4 monospace;color:#667788">VEPA v3 — Vector Emergent Physics Automata<br><br>Drag to pan | Scroll to zoom<br>Middle-drag to rotate | R to reset camera' +
+      '<br><br>Toggle laws to modify particle behavior.<br>World params control global physics.<br>Species params override behavior per species.';
   }
 
   _createPanel(title, id, startOpen) {

@@ -38,6 +38,21 @@ class Renderer {
 
     this.container.appendChild(this.app.canvas);
     this.stage = this.app.stage;
+
+    // Camera state
+    this.camera = {
+      x: this.width / 2,
+      y: this.height / 2,
+      zoom: 1.0,
+      rotation: 0, // radians
+    };
+
+    // Drag state
+    this._isDragging = false;
+    this._dragStart = { x: 0, y: 0 };
+    this._camStart = { x: 0, y: 0 };
+
+    this._bindMouseEvents();
   
   // Auto-resize to container
   this._resizeObserver = new ResizeObserver((entries) => {

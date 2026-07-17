@@ -23,6 +23,15 @@ class VepaEngine {
       particleCount: config.particleCount || 500,
       seed: config.seed || Date.now(),
       container: config.container || document.getElementById('canvas-container'),
+      // World parameters
+      gravityStrength: config.gravityStrength || 50000,
+      dragCoeff: config.dragCoeff || 0.001,
+      collisionStiffness: config.collisionStiffness || 0.5,
+      signalScale: config.signalScale || 0.5,
+      temperature: config.temperature || 0.5,
+      pressure: config.pressure || 0.5,
+      entropy: config.entropy || 0.1,
+      timeScale: config.timeScale || 1.0,
     };
 
     // Core systems
@@ -119,19 +128,23 @@ class VepaEngine {
   }
 
   _frame(dt) {
-    // Run physics (inline for now — worker integration in Phase 2b)
+    // Run physics
     this._tickPhysics(dt);
 
-    // Update sprites from buffer
+    // Camera transform
+    const cam = this.renderer ? this.renderer.getTransform() : { offsetX: 400, offsetY: 400, zoom: 1, rotation: 0 };
+
+    // Update sprites from buffer with camera transform
     this.renderer.ensurePool(this.particleCount);
     updateSprites(
       this.particleBuffer,
       this.particleCount,
       this.renderer.sprites,
       this.config.worldSize,
-      this.offsetX,
-      this.offsetY,
-      this.zoom
+      cam.offsetX,
+      cam.offsetY,
+      cam.zoom,
+      cam.rotation
     );
 
     // Render
@@ -169,7 +182,7 @@ class VepaEngine {
         if (ni === i) continue;
         const nb = ni * PARTICLE_STRIDE;
 
-        // Gravitational attraction
+        // Gravitational attraction (F = G * m1 * m2 / r^2)
         if (this.lawManager.isLaw(LAW_INDEXES.GRAV)) {
           const dx = bufferGet(this.particleBuffer, nb + s.POS_X) - bufferGet(this.particleBuffer, base + s.POS_X);
           const dy = bufferGet(this.particleBuffer, nb + s.POS_Y) - bufferGet(this.particleBuffer, base + s.POS_Y);
@@ -177,10 +190,17 @@ class VepaEngine {
           const distSq = dx * dx + dy * dy + dz * dz + 0.01;
           const dist = Math.sqrt(distSq);
           const massProduct = bufferGet(this.particleBuffer, base + s.MASS) * bufferGet(this.particleBuffer, nb + s.MASS);
-          const force = massProduct / distSq;
+          const force = this.config.gravityStrength * massProduct / distSq;
           fx += (dx / dist) * force;
           fy += (dy / dist) * force;
           fz += (dz / dist) * force;
+        }
+
+        // Drag (velocity damping)
+        if (this.lawManager.isLaw(LAW_INDEXES.DRAG)) {
+          fx -= bufferGet(this.particleBuffer, base + s.VEL_X) * this.config.dragCoeff;
+          fy -= bufferGet(this.particleBuffer, base + s.VEL_Y) * this.config.dragCoeff;
+          fz -= bufferGet(this.particleBuffer, base + s.VEL_Z) * this.config.dragCoeff;
         }
 
         // Collision
@@ -211,15 +231,17 @@ class VepaEngine {
       if (!isFinite(fy)) fy = 0;
       if (!isFinite(fz)) fz = 0;
 
-      // Integrate velocity
-      addTo(this.particleBuffer, base + s.VEL_X, fx * dt);
-      addTo(this.particleBuffer, base + s.VEL_Y, fy * dt);
-      addTo(this.particleBuffer, base + s.VEL_Z, fz * dt);
+      // Integrate velocity (a = F / m)
+      const invMass = 1 / Math.max(bufferGet(this.particleBuffer, base + s.MASS), 0.1);
+      const dtScaled = dt * this.config.timeScale;
+      addTo(this.particleBuffer, base + s.VEL_X, fx * invMass * dtScaled);
+      addTo(this.particleBuffer, base + s.VEL_Y, fy * invMass * dtScaled);
+      addTo(this.particleBuffer, base + s.VEL_Z, fz * invMass * dtScaled);
 
       // Integrate position (toroidal)
-      this._toroidalAdd(base + s.POS_X, bufferGet(this.particleBuffer, base + s.VEL_X) * dt);
-      this._toroidalAdd(base + s.POS_Y, bufferGet(this.particleBuffer, base + s.VEL_Y) * dt);
-      this._toroidalAdd(base + s.POS_Z, bufferGet(this.particleBuffer, base + s.VEL_Z) * dt);
+      this._toroidalAdd(base + s.POS_X, bufferGet(this.particleBuffer, base + s.VEL_X) * dtScaled);
+      this._toroidalAdd(base + s.POS_Y, bufferGet(this.particleBuffer, base + s.VEL_Y) * dtScaled);
+      this._toroidalAdd(base + s.POS_Z, bufferGet(this.particleBuffer, base + s.VEL_Z) * dtScaled);
 
       // Validate
       for (const off of [s.POS_X, s.POS_Y, s.POS_Z, s.VEL_X, s.VEL_Y, s.VEL_Z]) {
@@ -228,7 +250,7 @@ class VepaEngine {
       }
 
       // Age
-      addTo(this.particleBuffer, base + s.AGE, dt);
+      addTo(this.particleBuffer, base + s.AGE, dtScaled);
     }
 
     this.tickTime = performance.now() - startTime;

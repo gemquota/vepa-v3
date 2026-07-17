@@ -14,20 +14,34 @@ import { computeColor, computeRadius, computeAlpha } from './phenoType.js';
  * @param {number} offsetY - Camera/viewport offset Y
  * @param {number} zoom - Camera zoom level
  */
-export function updateSprites(buffer, count, sprites, worldSize, offsetX = 0, offsetY = 0, zoom = 1) {
+export function updateSprites(buffer, count, sprites, worldSize, offsetX = 0, offsetY = 0, zoom = 1, rotation = 0) {
   const s = STRIDE_INDEXES;
   const maxVisible = Math.min(count, sprites.length);
+  const cosR = Math.cos(-rotation);
+  const sinR = Math.sin(-rotation);
+  const halfWorld = worldSize / 2;
 
   for (let i = 0; i < maxVisible; i++) {
     const base = i * PARTICLE_STRIDE;
     const sprite = sprites[i];
 
-    // World to screen coordinates with camera
-    let sx = (buffer[base + s.POS_X] - offsetX) * zoom;
-    let sy = (buffer[base + s.POS_Y] - offsetY) * zoom;
+    // Toroidal centering — shift particle toward camera
+    let wx = buffer[base + s.POS_X] - offsetX;
+    let wy = buffer[base + s.POS_Y] - offsetY;
 
-    // Toroidal centering: wrap visually if needed
-    // (handled by main loop if camera follows center of mass)
+    // Toroidal wrap: pick the shortest path around the torus
+    if (wx > halfWorld) wx -= worldSize;
+    else if (wx < -halfWorld) wx += worldSize;
+    if (wy > halfWorld) wy -= worldSize;
+    else if (wy < -halfWorld) wy += worldSize;
+
+    // Rotate
+    const rx = wx * cosR - wy * sinR;
+    const ry = wx * sinR + wy * cosR;
+
+    // Zoom
+    let sx = rx * zoom + worldSize / 2;
+    let sy = ry * zoom + worldSize / 2;
 
     sprite.position.set(sx, sy);
 
