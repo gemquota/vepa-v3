@@ -3,16 +3,18 @@
 
 import { DNA_STRIDE, MAX_SPECIES, DNA_RANGES } from '../constants.js';
 
+// Use regular ArrayBuffer (no SharedArrayBuffer needed for inline physics)
+
 class DnaBuffer {
   /**
-   * @param {SharedArrayBuffer} [sharedBuffer] - Optional shared backing
+   * @param {ArrayBuffer} [buffer] - Optional backing buffer
    */
-  constructor(sharedBuffer) {
+  constructor(buffer) {
     const byteLength = MAX_SPECIES * DNA_STRIDE * 2; // 64×64×2 bytes
-    if (sharedBuffer) {
-      this.buffer = sharedBuffer;
+    if (buffer) {
+      this.buffer = buffer;
     } else {
-      this.buffer = new SharedArrayBuffer(byteLength);
+      this.buffer = new ArrayBuffer(byteLength);
     }
     this.data = new Uint16Array(this.buffer);
   }
