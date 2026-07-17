@@ -2,6 +2,7 @@
 // Main entry point: boot sequence, render loop, worker coordination.
 
 import EventBus from './core/eventBus.js';
+import UI from './ui/ui.js';
 import SplitMix32 from './core/prng.js';
 import Renderer from './render/renderer.js';
 import RenderLoop from './render/renderLoop.js';
@@ -279,10 +280,6 @@ if (typeof window !== 'undefined') {
     }, 5000);
 
     try {
-      setLoading('VEPA v3 — Loading UI...');
-
-      // Import UI after engine is loaded
-      const { default: UI } = await import('./ui/ui.js');
 
       const engine = new VepaEngine();
       window.vepa = engine;

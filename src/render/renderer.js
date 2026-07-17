@@ -20,14 +20,21 @@ class Renderer {
   }
 
   async init() {
-    await this.app.init({
+    // Force WebGL (skip WebGPU which can hang on some systems)
+    // Race against a timeout to prevent permanent hang
+    const initPromise = this.app.init({
       width: this.width,
       height: this.height,
       background: 0x0a0a12,
       antialias: true,
       resolution: window.devicePixelRatio || 1,
       autoDensity: true,
+      preference: 'webgl',
     });
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('PixiJS init timed out')), 5000)
+    );
+    await Promise.race([initPromise, timeout]);
 
     this.container.appendChild(this.app.canvas);
     this.stage = this.app.stage;
