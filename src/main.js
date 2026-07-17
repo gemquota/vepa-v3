@@ -351,9 +351,34 @@ if (typeof window !== 'undefined') {
 
     } catch (err) {
       console.error('[VEPA] Boot failed:', err);
-      setLoading('VEPA v3 — Error: ' + (err.message || 'Unknown error'));
-      // Still hide loading after showing error
-      setTimeout(() => { if (loading) loading.classList.add('hidden'); }, 4000);
+      // Build detailed error message
+      const detail = err.stack || err.message || String(err);
+      // Show error on loading screen with tap-to-copy
+      if (loading) {
+        loading.style.cssText = 'position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a0a12;color:#ff4444;font:12px/1.5 monospace;padding:20px;z-index:9999;cursor:pointer;text-align:left;overflow:auto;';
+        loading.innerHTML = '<div style="color:#ff6666;font-weight:bold;margin-bottom:8px;">⚠ VEPA v3 — Error</div>' +
+          '<div style="color:#cc8888;font-size:11px;margin-bottom:12px;max-width:600px;word-break:break-all;">' +
+          err.message + '</div>' +
+          '<pre style="color:#8899aa;font-size:10px;max-width:600px;overflow:auto;white-space:pre-wrap;">' +
+          (err.stack || 'No stack trace') + '</pre>' +
+          '<div style="color:#667788;font-size:10px;margin-top:12px;">tap to copy error details</div>';
+        loading.onclick = () => {
+          const text = 'VEPA v3 Error:\n' + err.message + '\n\n' + (err.stack || '');
+          navigator.clipboard.writeText(text).then(() => {
+            const msg = loading.querySelector('div:last-child');
+            if (msg) msg.textContent = '✓ copied to clipboard';
+          }).catch(() => {
+            // Fallback: select text manually
+            const range = document.createRange();
+            range.selectNodeContents(loading);
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+          });
+        };
+      }
+      // Still hide after showing error (longer for reading)
+      setTimeout(() => { if (loading) loading.classList.add('hidden'); }, 15000);
     }
   });
 }
