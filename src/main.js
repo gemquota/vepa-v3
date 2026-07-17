@@ -271,42 +271,70 @@ export default VepaEngine;
 if (typeof window !== 'undefined') {
   window.addEventListener('DOMContentLoaded', async () => {
     const loading = document.getElementById('loading');
+    const setLoading = (msg) => { if (loading) loading.textContent = msg; };
 
-    // Import UI after engine is loaded
-    const { default: UI } = await import('./ui/ui.js');
-
-    const engine = new VepaEngine();
-    window.vepa = engine;
-
-    // Init UI
-    const ui = new UI(engine);
-    engine.ui = ui;
-    ui.init();
-
-    await engine.init();
-
-    // Wire HUD updates
-    engine.bus.on('engine:ready', () => {
+    // Safety timeout — hide loading after 5s no matter what
+    const safetyTimeout = setTimeout(() => {
       if (loading) loading.classList.add('hidden');
-    });
+    }, 5000);
 
-    // Periodic HUD update
-    setInterval(() => {
-      const speciesList = engine.speciesManager.getAllSpecies();
-      ui.updateHUD({
-        fps: engine.fps,
-        particleCount: engine.particleCount,
-        speciesCount: speciesList.length,
-        tickTime: engine.tickTime,
-        activeLaws: Object.values(engine.lawManager.getAllLaws()).filter(Boolean).length,
+    try {
+      setLoading('VEPA v3 — Loading UI...');
+
+      // Import UI after engine is loaded
+      const { default: UI } = await import('./ui/ui.js');
+
+      const engine = new VepaEngine();
+      window.vepa = engine;
+
+      setLoading('VEPA v3 — Initializing UI...');
+
+      // Init UI
+      const ui = new UI(engine);
+      engine.ui = ui;
+      ui.init();
+
+      // Wire HUD updates (before init so they're ready)
+      setInterval(() => {
+        try {
+          const speciesList = engine.speciesManager.getAllSpecies();
+          ui.updateHUD({
+            fps: engine.fps,
+            particleCount: engine.particleCount,
+            speciesCount: speciesList.length,
+            tickTime: engine.tickTime,
+            activeLaws: Object.values(engine.lawManager.getAllLaws()).filter(Boolean).length,
+          });
+        } catch (e) { /* silently skip HUD update errors */ }
+      }, 250);
+
+      // Wire reset
+      engine.bus.on('ui:reset', () => {
+        engine.reset();
+        engine._spawnParticles(engine.config.particleCount);
+        ui._rebuildSpeciesUI();
       });
-    }, 250);
 
-    // Wire reset
-    engine.bus.on('ui:reset', () => {
-      engine.reset();
-      engine._spawnParticles(engine.config.particleCount);
-      ui._rebuildSpeciesUI();
-    });
+      setLoading('VEPA v3 — Starting simulation...');
+
+      await engine.init();
+
+      // Hide loading on ready
+      engine.bus.on('engine:ready', () => {
+        clearTimeout(safetyTimeout);
+        if (loading) loading.classList.add('hidden');
+      });
+
+      // Also hide if we somehow missed the event
+      setTimeout(() => {
+        if (loading) loading.classList.add('hidden');
+      }, 2000);
+
+    } catch (err) {
+      console.error('[VEPA] Boot failed:', err);
+      setLoading('VEPA v3 — Error: ' + (err.message || 'Unknown error'));
+      // Still hide loading after showing error
+      setTimeout(() => { if (loading) loading.classList.add('hidden'); }, 4000);
+    }
   });
 }

@@ -23,7 +23,7 @@ class Renderer {
     await this.app.init({
       width: this.width,
       height: this.height,
-      backgroundColor: 0x0a0a12,
+      background: 0x0a0a12,
       antialias: true,
       resolution: window.devicePixelRatio || 1,
       autoDensity: true,
@@ -31,6 +31,15 @@ class Renderer {
 
     this.container.appendChild(this.app.canvas);
     this.stage = this.app.stage;
+  
+  // Auto-resize to container
+  this._resizeObserver = new ResizeObserver((entries) => {
+    for (const entry of entries) {
+      const { width, height } = entry.contentRect;
+      if (width > 0 && height > 0) this.resize(width, height);
+    }
+  });
+  this._resizeObserver.observe(this.container);
   }
 
   /**
