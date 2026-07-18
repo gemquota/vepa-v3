@@ -1,6 +1,7 @@
 // VEPA v3 — VepaEngine Orchestrator
 // Main entry point: boot sequence, render loop, worker coordination.
 
+import * as PIXI from "pixi.js";
 import EventBus from './core/eventBus.js';
 import UI from './ui/ui.js';
 import SplitMix32 from './core/prng.js';
@@ -102,6 +103,18 @@ class VepaEngine {
     );
     await this.renderer.init();
     console.log('[VEPA] Renderer initialized');
+
+    // Create diagnostic particles directly on stage
+    this._diagParticles = [];
+    for (let i = 0; i < 10; i++) {
+      const p = new PIXI.Graphics();
+      p.beginFill(0x00ff88);
+      p.drawCircle(0, 0, 6);
+      p.endFill();
+      p.visible = false;
+      this.renderer.stage.addChild(p);
+      this._diagParticles.push(p);
+    }
 
     // 3. Spawn initial particles
     this._spawnParticles(this.config.initialCount || this.config.particleCount);
@@ -225,9 +238,23 @@ class VepaEngine {
       this.renderer.height
     );
 
-    // Diagnostic: render direct test particles
-    if (this.renderer.renderTestParticles) {
-      this.renderer.renderTestParticles(this.particleBuffer, this.particleCount);
+    // Diagnostic: render first 10 particles directly (bypassing ensurePool/updateSprites)
+    if (this._diagParticles && this._diagParticles.length > 0) {
+      const s = { POS_X: 0, POS_Y: 1, POS_Z: 2, DEAD: 74 };
+      const cam = this.renderer.getTransform();
+      const halfW = this.config.worldSize / 2;
+      const cx = this.renderer.width / 2;
+      const cy = this.renderer.height / 2;
+      for (let i = 0; i < Math.min(10, this.particleCount); i++) {
+        const base = i * 100;
+        const wx = this.particleBuffer[base] - cam.offsetX;
+        const wy = this.particleBuffer[base + 1] - cam.offsetY;
+        let sx = wx * cam.zoom + cx;
+        let sy = wy * cam.zoom + cy;
+        const p = this._diagParticles[i];
+        p.position.set(sx, sy);
+        p.visible = this.particleBuffer[base + 74] < 1;
+      }
     }
 
     // Render

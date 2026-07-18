@@ -13,6 +13,7 @@ class Renderer {
     this.container = container;
     this.width = width;
     this.height = height;
+    this.worldSize = Math.max(width, height); // World extent (not canvas size)
     this.sprites = [];
     this.spriteCount = 0;
 
@@ -37,6 +38,7 @@ class Renderer {
     await Promise.race([initPromise, timeout]);
 
     this.container.appendChild(this.app.canvas);
+    this.app.canvas.style.touchAction = 'none';
     this.stage = this.app.stage;
 
     // Debug: add a text overlay to verify renderer is working
@@ -103,9 +105,13 @@ class Renderer {
         if (width > 0 && height > 0) {
           this.resize(width, height);
           if (this.camera && this._centerOnWorld) {
-            // Center on canvas after initial layout
-            this.camera.x = this.width / 2;
-            this.camera.y = this.height / 2;
+            // Center on world center (not canvas center — canvas may be small)
+            this.camera.x = this.worldSize / 2;
+            this.camera.y = this.worldSize / 2;
+            // Auto-zoom to fit world in viewport (important for mobile)
+            const zoomX = this.width / this.worldSize;
+            const zoomY = this.height / this.worldSize;
+            this.camera.zoom = Math.min(zoomX, zoomY, 2); // Don't zoom in more than 2x
             this._centerOnWorld = false;
           }
         }
@@ -254,6 +260,7 @@ class Renderer {
     let lastDist = 0;
 
     canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
       if (e.touches.length === 1) {
         lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
         this._camStart.x = this.camera.x;
@@ -264,7 +271,7 @@ class Renderer {
           e.touches[0].clientY - e.touches[1].clientY
         );
       }
-    }, { passive: true });
+    }, { passive: false });
 
     canvas.addEventListener('touchmove', (e) => {
       e.preventDefault();
