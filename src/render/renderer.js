@@ -39,6 +39,17 @@ class Renderer {
     this.container.appendChild(this.app.canvas);
     this.stage = this.app.stage;
 
+    // Debug: add a text overlay to verify renderer is working
+    this._debugText = new PIXI.Text('Debug: Renderer OK', {
+      fill: 0xff4444,
+      fontSize: 14,
+      fontFamily: 'monospace',
+    });
+    this._debugText.x = 10;
+    this._debugText.y = 10;
+    this._debugText.zIndex = 9999;
+    this.stage.addChild(this._debugText);
+
     // Camera state
     this.camera = {
       x: this.width / 2,
