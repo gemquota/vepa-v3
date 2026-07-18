@@ -14,18 +14,20 @@ import { computeColor, computeRadius, computeAlpha } from './phenoType.js';
  * @param {number} offsetY - Camera/viewport offset Y
  * @param {number} zoom - Camera zoom level
  */
-export function updateSprites(buffer, count, sprites, worldSize, offsetX = 0, offsetY = 0, zoom = 1, rotation = 0) {
+export function updateSprites(buffer, count, sprites, worldSize, offsetX = 0, offsetY = 0, zoom = 1, rotation = 0, screenW = 800, screenH = 600) {
   const s = STRIDE_INDEXES;
   const maxVisible = Math.min(count, sprites.length);
   const cosR = Math.cos(-rotation);
   const sinR = Math.sin(-rotation);
   const halfWorld = worldSize / 2;
+  const screenCX = screenW / 2;
+  const screenCY = screenH / 2;
 
   for (let i = 0; i < maxVisible; i++) {
     const base = i * PARTICLE_STRIDE;
     const sprite = sprites[i];
 
-    // Toroidal centering — shift particle toward camera
+    // World position to camera-relative (toroidal shortest path)
     let wx = buffer[base + s.POS_X] - offsetX;
     let wy = buffer[base + s.POS_Y] - offsetY;
 
@@ -35,13 +37,13 @@ export function updateSprites(buffer, count, sprites, worldSize, offsetX = 0, of
     if (wy > halfWorld) wy -= worldSize;
     else if (wy < -halfWorld) wy += worldSize;
 
-    // Rotate
+    // Rotate around screen center
     const rx = wx * cosR - wy * sinR;
     const ry = wx * sinR + wy * cosR;
 
-    // Zoom
-    let sx = rx * zoom + worldSize / 2;
-    let sy = ry * zoom + worldSize / 2;
+    // Zoom + center on screen
+    const sx = rx * zoom + screenCX;
+    const sy = ry * zoom + screenCY;
 
     sprite.position.set(sx, sy);
 
@@ -55,12 +57,12 @@ export function updateSprites(buffer, count, sprites, worldSize, offsetX = 0, of
     sprite.alpha = computeAlpha(buffer, base);
 
     // Radius (scaled by zoom)
-    const r = computeRadius(buffer, base) * zoom;
-    // Rebuild graphic if size changed significantly
-    if (Math.abs(sprite._currentRadius - r) > 0.5) {
+    const r = Math.max(1, computeRadius(buffer, base) * zoom);
+    // Redraw graphic if size changed
+    if (sprite._currentRadius === undefined || Math.abs(sprite._currentRadius - r) > 0.5) {
       sprite.clear();
       sprite.beginFill(0xffffff);
-      sprite.drawCircle(0, 0, Math.max(1, r));
+      sprite.drawCircle(0, 0, r);
       sprite.endFill();
       sprite._currentRadius = r;
     }
@@ -68,12 +70,10 @@ export function updateSprites(buffer, count, sprites, worldSize, offsetX = 0, of
     // Visibility
     sprite.visible = buffer[base + s.DEAD] < 1;
 
-    // Scale flash on signal
+    // Flash brighter on signal
     const signal = buffer[base + s.SIGNAL] || 0;
     if (signal > 0.1) {
-      sprite.scale.set(1 + signal * 0.3);
-    } else {
-      sprite.scale.set(1);
+      sprite.alpha = Math.min(1, computeAlpha(buffer, base) + signal * 0.3);
     }
   }
 

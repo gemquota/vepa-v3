@@ -17,6 +17,10 @@ class HUD {
       `Species: ${stats.speciesCount || 0}`,
       `Tick: ${(stats.tickTime || 0).toFixed(2)}ms`,
       `Laws: ${stats.activeLaws || 0}/64`,
+      `Cam: ${(stats.camX || 0).toFixed(0)},${(stats.camY || 0).toFixed(0)} @${(stats.camZoom || 1).toFixed(2)}x`,
+      `G: ${(stats.gravity || 0).toFixed(0)}`,
+      `Ent: ${(stats.entropy || 0).toFixed(2)}`,
+      `Wind: ${(stats.windX || 0).toFixed(1)},${(stats.windY || 0).toFixed(1)}`,
     ].join('<br>');
   }
 

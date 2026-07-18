@@ -44,8 +44,10 @@ class Renderer {
       x: this.width / 2,
       y: this.height / 2,
       zoom: 1.0,
-      rotation: 0, // radians
+      rotation: 0,
     };
+    // After first resize, center on world
+    this._centerOnWorld = true;
 
     // Drag state
     this._isDragging = false;
@@ -54,14 +56,22 @@ class Renderer {
 
     this._bindMouseEvents();
   
-  // Auto-resize to container
-  this._resizeObserver = new ResizeObserver((entries) => {
-    for (const entry of entries) {
-      const { width, height } = entry.contentRect;
-      if (width > 0 && height > 0) this.resize(width, height);
-    }
-  });
-  this._resizeObserver.observe(this.container);
+    // Auto-resize to container
+    this._resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0) {
+          this.resize(width, height);
+          if (this.camera && this._centerOnWorld) {
+            // Center on canvas after initial layout
+            this.camera.x = this.width / 2;
+            this.camera.y = this.height / 2;
+            this._centerOnWorld = false;
+          }
+        }
+      }
+    });
+    this._resizeObserver.observe(this.container);
   }
 
   /**
@@ -70,10 +80,12 @@ class Renderer {
   ensurePool(count) {
     while (this.sprites.length < count) {
       const sprite = new PIXI.Graphics();
+      // Draw a visible initial circle so it shows even before first update
       sprite.beginFill(0xffffff);
-      sprite.drawCircle(0, 0, 1);
+      sprite.drawCircle(0, 0, 4);
       sprite.endFill();
       sprite.visible = false;
+      sprite._currentRadius = -1; // Force redraw on first update
       this.stage.addChild(sprite);
       this.sprites.push(sprite);
     }
@@ -94,8 +106,141 @@ class Renderer {
     this.app.renderer.render(this.stage);
   }
 
+  _bindMouseEvents() {
+    const canvas = this.app.canvas;
+    if (!canvas) return;
+
+    // Pan with left-click drag
+    canvas.addEventListener('mousedown', (e) => {
+      if (e.button === 0) {
+        this._isDragging = true;
+        this._dragStart.x = e.clientX;
+        this._dragStart.y = e.clientY;
+        this._camStart.x = this.camera.x;
+        this._camStart.y = this.camera.y;
+        canvas.style.cursor = 'grabbing';
+      }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (this._isDragging) {
+        const dx = (e.clientX - this._dragStart.x) / this.camera.zoom;
+        const dy = (e.clientY - this._dragStart.y) / this.camera.zoom;
+        const cos = Math.cos(this.camera.rotation);
+        const sin = Math.sin(this.camera.rotation);
+        this.camera.x = this._camStart.x - (dx * cos - dy * sin);
+        this.camera.y = this._camStart.y - (dx * sin + dy * cos);
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (this._isDragging) {
+        this._isDragging = false;
+        canvas.style.cursor = 'default';
+      }
+    });
+
+    // Zoom with scroll wheel
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      this.camera.zoom = Math.max(0.1, Math.min(10, this.camera.zoom * delta));
+    }, { passive: false });
+
+    // Rotate with middle-click drag
+    canvas.addEventListener('mousedown', (e) => {
+      if (e.button === 1) {
+        e.preventDefault();
+        this._isRotating = true;
+        this._dragStart.x = e.clientX;
+        this._dragStart.y = e.clientY;
+        this._rotStart = this.camera.rotation;
+        canvas.style.cursor = 'ew-resize';
+      }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (this._isRotating) {
+        const dx = e.clientX - this._dragStart.x;
+        this.camera.rotation = this._rotStart + dx * 0.01;
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (this._isRotating) {
+        this._isRotating = false;
+        canvas.style.cursor = 'default';
+      }
+    });
+
+    // Keyboard: R to reset camera
+    this._keyHandler = (e) => {
+      if (e.key === 'r' || e.key === 'R') {
+        this.camera.x = this.width / 2;
+        this.camera.y = this.height / 2;
+        this.camera.zoom = 1.0;
+        this.camera.rotation = 0;
+      }
+    };
+    window.addEventListener('keydown', this._keyHandler);
+
+    // Touch support
+    this._setupTouchEvents(canvas);
+  }
+
+  _setupTouchEvents(canvas) {
+    if (!canvas) return;
+    let lastTouch = null;
+    let lastDist = 0;
+
+    canvas.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1) {
+        lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        this._camStart.x = this.camera.x;
+        this._camStart.y = this.camera.y;
+      } else if (e.touches.length === 2) {
+        lastDist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+      }
+    }, { passive: true });
+
+    canvas.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      if (e.touches.length === 1 && lastTouch) {
+        const dx = (e.touches[0].clientX - lastTouch.x) / this.camera.zoom;
+        const dy = (e.touches[0].clientY - lastTouch.y) / this.camera.zoom;
+        this.camera.x = this._camStart.x - dx;
+        this.camera.y = this._camStart.y - dy;
+      } else if (e.touches.length === 2) {
+        const dist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        if (lastDist > 0) {
+          this.camera.zoom *= dist / lastDist;
+          this.camera.zoom = Math.max(0.1, Math.min(10, this.camera.zoom));
+        }
+        lastDist = dist;
+      }
+    }, { passive: false });
+  }
+
+  /** Get camera transform for sprite rendering */
+  getTransform() {
+    return {
+      offsetX: this.camera.x,
+      offsetY: this.camera.y,
+      zoom: this.camera.zoom,
+      rotation: this.camera.rotation,
+    };
+  }
+
   /** Clean up. */
   destroy() {
+    if (this._keyHandler) window.removeEventListener('keydown', this._keyHandler);
+    if (this._resizeObserver) this._resizeObserver.disconnect();
     this.app.destroy(true);
     this.sprites = [];
     this.spriteCount = 0;

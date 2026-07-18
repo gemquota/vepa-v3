@@ -21,6 +21,7 @@ class VepaEngine {
     this.config = {
       worldSize: config.worldSize || 800,
       particleCount: config.particleCount || 500,
+      initialCount: config.initialCount || 500,
       seed: config.seed || Date.now(),
       container: config.container || document.getElementById('canvas-container'),
       // World parameters
@@ -32,6 +33,28 @@ class VepaEngine {
       pressure: config.pressure || 0.5,
       entropy: config.entropy || 0.1,
       timeScale: config.timeScale || 1.0,
+      // V2-compatible world params
+      globalViscosity: config.globalViscosity || 0.98,
+      spawnRate: config.spawnRate || 0,
+      shape: config.shape || 0.5,
+      spreadX: config.spreadX || 0.8,
+      spreadY: config.spreadY || 0.8,
+      spreadZ: config.spreadZ || 0.5,
+      order: config.order || 0.5,
+      centerDensity: config.centerDensity || 0,
+      densityRadius: config.densityRadius || 0.25,
+      densityMultiplier: config.densityMultiplier || 2.0,
+      baseSize: config.baseSize || 4.0,
+      dimX: config.dimX || 800,
+      dimY: config.dimY || 800,
+      dimZ: config.dimZ || 400,
+      windX: config.windX || 0,
+      windY: config.windY || 0,
+      windZ: config.windZ || 0,
+      distributionType: config.distributionType || 'Grid',
+      distributionCenterX: config.distributionCenterX || 0.5,
+      distributionCenterY: config.distributionCenterY || 0.5,
+      distributionCenterZ: config.distributionCenterZ || 0.5,
     };
 
     // Core systems
@@ -81,7 +104,7 @@ class VepaEngine {
     console.log('[VEPA] Renderer initialized');
 
     // 3. Spawn initial particles
-    this._spawnParticles(this.config.particleCount);
+    this._spawnParticles(this.config.initialCount || this.config.particleCount);
 
     // 4. Init render loop
     this.renderLoop = new RenderLoop((dt) => this._frame(dt));
@@ -96,14 +119,67 @@ class VepaEngine {
     const s = STRIDE_INDEXES;
     const speciesList = this.speciesManager.getAllSpecies();
     if (speciesList.length === 0) return;
+    const cfg = this.config;
+    const ws = cfg.worldSize;
+    const cx = ws * (cfg.distributionCenterX || 0.5);
+    const cy = ws * (cfg.distributionCenterY || 0.5);
+    const cz = ws * (cfg.distributionCenterZ || 0.5);
+    const sx = (cfg.spreadX || 0.8) * ws;
+    const sy = (cfg.spreadY || 0.8) * ws;
+    const sz = (cfg.spreadZ || 0.5) * ws;
 
     for (let i = 0; i < Math.min(count, MAX_PARTICLES); i++) {
       const base = i * PARTICLE_STRIDE;
+      let px, py, pz;
 
-      // Random position
-      bufferSet(this.particleBuffer, base + s.POS_X, this.prng.range(0, this.config.worldSize));
-      bufferSet(this.particleBuffer, base + s.POS_Y, this.prng.range(0, this.config.worldSize));
-      bufferSet(this.particleBuffer, base + s.POS_Z, this.prng.range(0, this.config.worldSize));
+      // First particle always at world center (debug)
+      if (i === 0) {
+        px = ws / 2;
+        py = ws / 2;
+        pz = ws / 2;
+        bufferSet(this.particleBuffer, base + s.MASS, 5.0); // Make it big
+        bufferSet(this.particleBuffer, base + s.RADIUS, 10); // Big radius
+      } else {
+      // Position based on distribution type
+      const dist = cfg.distributionType || 'Grid';
+      if (dist === 'Grid') {
+        const cols = Math.ceil(Math.sqrt(count));
+        const row = Math.floor(i / cols);
+        const col = i % cols;
+        px = (col / cols) * ws;
+        py = (row / cols) * ws;
+        pz = cz + this.prng.range(-sz/2, sz/2);
+      } else if (dist === 'Big Bang') {
+        const angle = this.prng.nextFloat() * Math.PI * 2;
+        const radius = this.prng.nextFloat() * ws * 0.4;
+        px = cx + Math.cos(angle) * radius;
+        py = cy + Math.sin(angle) * radius;
+        pz = cz + this.prng.range(-sz/2, sz/2);
+      } else if (dist === 'Bipolar') {
+        const pole = this.prng.nextFloat() > 0.5 ? 1 : -1;
+        const angle = this.prng.nextFloat() * Math.PI * 2;
+        const radius = this.prng.nextFloat() * sx * 0.3;
+        px = cx + Math.cos(angle) * radius + pole * sx * 0.3;
+        py = cy + Math.sin(angle) * radius;
+        pz = cz + pole * sz * 0.3;
+      } else if (dist === 'Galaxy') {
+        const arm = Math.floor(this.prng.nextFloat() * 3);
+        const angle = this.prng.nextFloat() * Math.PI * 2 + arm * Math.PI * 2/3;
+        const radius = this.prng.nextFloat() * sx * 0.4;
+        px = cx + Math.cos(angle) * radius;
+        py = cy + Math.sin(angle) * radius;
+        pz = cz + this.prng.range(-sz/4, sz/4);
+      } else {
+        // Soup (uniform random)
+        px = this.prng.range(0, ws);
+        py = this.prng.range(0, ws);
+        pz = this.prng.range(0, ws);
+      }
+      }
+
+      bufferSet(this.particleBuffer, base + s.POS_X, ((px % ws) + ws) % ws);
+      bufferSet(this.particleBuffer, base + s.POS_Y, ((py % ws) + ws) % ws);
+      bufferSet(this.particleBuffer, base + s.POS_Z, ((pz % ws) + ws) % ws);
 
       // Small random velocity
       bufferSet(this.particleBuffer, base + s.VEL_X, this.prng.range(-0.5, 0.5));
@@ -144,7 +220,9 @@ class VepaEngine {
       cam.offsetX,
       cam.offsetY,
       cam.zoom,
-      cam.rotation
+      cam.rotation,
+      this.renderer.width,
+      this.renderer.height
     );
 
     // Render
@@ -157,7 +235,7 @@ class VepaEngine {
   _tickPhysics(dt) {
     const startTime = performance.now();
     const s = STRIDE_INDEXES;
-    const lawFlags = this.lawManager.getFlags();
+    const cfg = this.config;
 
     // Rebuild grid
     this.grid.clear();
@@ -172,8 +250,12 @@ class VepaEngine {
       const base = i * PARTICLE_STRIDE;
       if (bufferGet(this.particleBuffer, base + s.DEAD) >= 1) continue;
 
+      const mass = Math.max(bufferGet(this.particleBuffer, base + s.MASS), 0.1);
+      const invMass = 1 / mass;
+      const dtScaled = dt * cfg.timeScale;
+
       const neighbors = this.grid.getNeighborsForParticle(i, this.particleBuffer, PARTICLE_STRIDE);
-      const maxN = Math.min(neighbors.count, 500); // MAX_INTERACTIONS
+      const maxN = Math.min(neighbors.count, 500);
 
       let fx = 0, fy = 0, fz = 0;
 
@@ -182,58 +264,180 @@ class VepaEngine {
         if (ni === i) continue;
         const nb = ni * PARTICLE_STRIDE;
 
-        // Gravitational attraction (F = G * m1 * m2 / r^2)
+        const dx = bufferGet(this.particleBuffer, nb + s.POS_X) - bufferGet(this.particleBuffer, base + s.POS_X);
+        const dy = bufferGet(this.particleBuffer, nb + s.POS_Y) - bufferGet(this.particleBuffer, base + s.POS_Y);
+        const dz = bufferGet(this.particleBuffer, nb + s.POS_Z) - bufferGet(this.particleBuffer, base + s.POS_Z);
+        const distSq = dx * dx + dy * dy + dz * dz + 0.01;
+        const dist = Math.sqrt(distSq);
+
+        // ── GRAVITY ──
         if (this.lawManager.isLaw(LAW_INDEXES.GRAV)) {
-          const dx = bufferGet(this.particleBuffer, nb + s.POS_X) - bufferGet(this.particleBuffer, base + s.POS_X);
-          const dy = bufferGet(this.particleBuffer, nb + s.POS_Y) - bufferGet(this.particleBuffer, base + s.POS_Y);
-          const dz = bufferGet(this.particleBuffer, nb + s.POS_Z) - bufferGet(this.particleBuffer, base + s.POS_Z);
-          const distSq = dx * dx + dy * dy + dz * dz + 0.01;
-          const dist = Math.sqrt(distSq);
-          const massProduct = bufferGet(this.particleBuffer, base + s.MASS) * bufferGet(this.particleBuffer, nb + s.MASS);
-          const force = this.config.gravityStrength * massProduct / distSq;
+          const massProduct = mass * bufferGet(this.particleBuffer, nb + s.MASS);
+          const force = cfg.gravityStrength * massProduct / distSq;
           fx += (dx / dist) * force;
           fy += (dy / dist) * force;
           fz += (dz / dist) * force;
         }
 
-        // Drag (velocity damping)
-        if (this.lawManager.isLaw(LAW_INDEXES.DRAG)) {
-          fx -= bufferGet(this.particleBuffer, base + s.VEL_X) * this.config.dragCoeff;
-          fy -= bufferGet(this.particleBuffer, base + s.VEL_Y) * this.config.dragCoeff;
-          fz -= bufferGet(this.particleBuffer, base + s.VEL_Z) * this.config.dragCoeff;
-        }
-
-        // Collision
+        // ── COLLISION ──
         if (this.lawManager.isLaw(LAW_INDEXES.COLL)) {
-          const dx = bufferGet(this.particleBuffer, nb + s.POS_X) - bufferGet(this.particleBuffer, base + s.POS_X);
-          const dy = bufferGet(this.particleBuffer, nb + s.POS_Y) - bufferGet(this.particleBuffer, base + s.POS_Y);
-          const dz = bufferGet(this.particleBuffer, nb + s.POS_Z) - bufferGet(this.particleBuffer, base + s.POS_Z);
-          const distSq = dx * dx + dy * dy + dz * dz;
           const rA = bufferGet(this.particleBuffer, base + s.RADIUS);
           const rB = bufferGet(this.particleBuffer, nb + s.RADIUS);
-          if (distSq < (rA + rB) * (rA + rB) && distSq > 0.01) {
-            const dist = Math.sqrt(distSq);
-            const overlap = (rA + rB) - dist;
-            const force = overlap * 0.3;
-            fx -= (dx / dist) * force;
-            fy -= (dy / dist) * force;
-            fz -= (dz / dist) * force;
+          const colDistSq = dx * dx + dy * dy + dz * dz;
+          if (colDistSq < (rA + rB) * (rA + rB) && colDistSq > 0.01) {
+            const colDist = Math.sqrt(colDistSq);
+            const overlap = (rA + rB) - colDist;
+            const force = overlap * cfg.collisionStiffness;
+            fx -= (dx / colDist) * force;
+            fy -= (dy / colDist) * force;
+            fz -= (dz / colDist) * force;
+          }
+        }
+
+        // ── AFFINITY (social attraction/repulsion) ──
+        if (this.lawManager.isLaw(LAW_INDEXES.AFFINITY)) {
+          const spA = bufferGet(this.particleBuffer, base + s.SPECIES_ID);
+          const spB = bufferGet(this.particleBuffer, nb + s.SPECIES_ID);
+          if (spA === spB) {
+            // Same species: attract
+            const force = cfg.gravityStrength * 0.1 / distSq;
+            fx += (dx / dist) * force;
+            fy += (dy / dist) * force;
+            fz += (dz / dist) * force;
+          }
+        }
+
+        // ── PREDATION ──
+        if (this.lawManager.isLaw(LAW_INDEXES.PREDATION)) {
+          const massA = mass;
+          const massB = bufferGet(this.particleBuffer, nb + s.MASS);
+          // Predator (higher mass) chases prey (lower mass)
+          if (massA > massB * 1.5) {
+            const force = cfg.gravityStrength * 0.3 / distSq;
+            fx += (dx / dist) * force;
+            fy += (dy / dist) * force;
+            fz += (dz / dist) * force;
+          }
+        }
+
+        // ── BOND ──
+        if (this.lawManager.isLaw(LAW_INDEXES.BOND)) {
+          const rA = bufferGet(this.particleBuffer, base + s.RADIUS);
+          const rB = bufferGet(this.particleBuffer, nb + s.RADIUS);
+          const bondDist = (rA + rB) * 1.5;
+          if (dist < bondDist) {
+            const springForce = (bondDist - dist) * 0.05;
+            fx += (dx / dist) * springForce;
+            fy += (dy / dist) * springForce;
+            fz += (dz / dist) * springForce;
+          }
+        }
+
+        // ── ELECTRIC (polarity-based) ──
+        if (this.lawManager.isLaw(LAW_INDEXES.ELEC)) {
+          // Assumes POLARITY DNA param expressed in a range; use cached signal as proxy
+          const sigA = bufferGet(this.particleBuffer, base + s.SIGNAL) || 0;
+          const sigB = bufferGet(this.particleBuffer, nb + s.SIGNAL) || 0;
+          const chargeProduct = sigA * sigB;
+          if (Math.abs(chargeProduct) > 0.01) {
+            const force = chargeProduct * 50 / distSq;
+            fx += (dx / dist) * force;
+            fy += (dy / dist) * force;
+            fz += (dz / dist) * force;
           }
         }
       }
 
-      // Clamp
-      fx = clamp(fx, -50, 50);
-      fy = clamp(fy, -50, 50);
-      fz = clamp(fz, -50, 50);
+      // ── DRAG (velocity damping) ──
+      if (this.lawManager.isLaw(LAW_INDEXES.DRAG)) {
+        fx -= bufferGet(this.particleBuffer, base + s.VEL_X) * cfg.dragCoeff;
+        fy -= bufferGet(this.particleBuffer, base + s.VEL_Y) * cfg.dragCoeff;
+        fz -= bufferGet(this.particleBuffer, base + s.VEL_Z) * cfg.dragCoeff;
+      }
 
+      // ── ENTROPY (thermal jitter) ──
+      if (this.lawManager.isLaw(LAW_INDEXES.ENTR)) {
+        const jitter = cfg.entropy * 10;
+        fx += (this.prng.nextFloat() - 0.5) * jitter;
+        fy += (this.prng.nextFloat() - 0.5) * jitter;
+        fz += (this.prng.nextFloat() - 0.5) * jitter;
+      }
+
+      // ── JITTER (Brownian motion, scaled by temperature) ──
+      if (this.lawManager.isLaw(LAW_INDEXES.JITTER_LAW)) {
+        const jit = cfg.temperature * 5;
+        fx += (this.prng.nextFloat() - 0.5) * jit;
+        fy += (this.prng.nextFloat() - 0.5) * jit;
+        fz += (this.prng.nextFloat() - 0.5) * jit;
+      }
+
+      // ── WIND (global flow) ──
+      fx += cfg.windX || 0;
+      fy += cfg.windY || 0;
+      fz += cfg.windZ || 0;
+
+      // ── GLOBAL VISCOSITY (velocity scaling) ──
+      if (cfg.globalViscosity < 1.0) {
+        const vScale = 1 - (1 - cfg.globalViscosity) * 0.1;
+        bufferSet(this.particleBuffer, base + s.VEL_X, bufferGet(this.particleBuffer, base + s.VEL_X) * vScale);
+        bufferSet(this.particleBuffer, base + s.VEL_Y, bufferGet(this.particleBuffer, base + s.VEL_Y) * vScale);
+        bufferSet(this.particleBuffer, base + s.VEL_Z, bufferGet(this.particleBuffer, base + s.VEL_Z) * vScale);
+      }
+
+      // ── TORQUE (vorticity) ──
+      if (this.lawManager.isLaw(LAW_INDEXES.TORQUE_LAW)) {
+        // Simple rotational bias
+        fx += -fy * 0.01;
+        fy += fx * 0.01;
+      }
+
+      // ── GLOW (signal emission) ──
+      if (this.lawManager.isLaw(LAW_INDEXES.GLOW)) {
+        // Signal proportional to temperature + energy
+        const energy = bufferGet(this.particleBuffer, base + s.ENERGY) || 0;
+        const sig = (cfg.temperature * 0.5 + energy / 200) * 0.5;
+        bufferSet(this.particleBuffer, base + s.SIGNAL, Math.min(1, sig));
+      }
+
+      // ── LIFE (energy drain / aging) ──
+      if (this.lawManager.isLaw(LAW_INDEXES.LIFE)) {
+        const energy = bufferGet(this.particleBuffer, base + s.ENERGY);
+        const drain = 0.01 * dtScaled;
+        bufferSet(this.particleBuffer, base + s.ENERGY, Math.max(0, energy - drain));
+        if (energy <= 0) {
+          bufferSet(this.particleBuffer, base + s.DEAD, 1);
+        }
+      }
+
+      // ── SENESCENCE (accelerated aging) ──
+      if (this.lawManager.isLaw(LAW_INDEXES.SENESCENCE)) {
+        const age = bufferGet(this.particleBuffer, base + s.AGE);
+        if (age > 100) {
+          // Older particles take more damage
+          const dmg = (age - 100) * 0.001 * dtScaled;
+          const energy = bufferGet(this.particleBuffer, base + s.ENERGY);
+          bufferSet(this.particleBuffer, base + s.ENERGY, Math.max(0, energy - dmg));
+        }
+      }
+
+      // ── TIME (time dilation by mass) ──
+      if (this.lawManager.isLaw(LAW_INDEXES.TIME)) {
+        // High mass = slower time (reduce velocity integration)
+        const dilation = 1 / (1 + mass * 0.01);
+        fx *= dilation;
+        fy *= dilation;
+        fz *= dilation;
+      }
+
+      // Clamp forces
+      fx = clamp(fx, -MAX_FORCE, MAX_FORCE);
+      fy = clamp(fy, -MAX_FORCE, MAX_FORCE);
+      fz = clamp(fz, -MAX_FORCE, MAX_FORCE);
       if (!isFinite(fx)) fx = 0;
       if (!isFinite(fy)) fy = 0;
       if (!isFinite(fz)) fz = 0;
 
-      // Integrate velocity (a = F / m)
-      const invMass = 1 / Math.max(bufferGet(this.particleBuffer, base + s.MASS), 0.1);
-      const dtScaled = dt * this.config.timeScale;
+      // Integrate velocity
       addTo(this.particleBuffer, base + s.VEL_X, fx * invMass * dtScaled);
       addTo(this.particleBuffer, base + s.VEL_Y, fy * invMass * dtScaled);
       addTo(this.particleBuffer, base + s.VEL_Z, fz * invMass * dtScaled);
@@ -317,12 +521,20 @@ if (typeof window !== 'undefined') {
       setInterval(() => {
         try {
           const speciesList = engine.speciesManager.getAllSpecies();
+          const cam = engine.renderer ? engine.renderer.getTransform() : {};
           ui.updateHUD({
             fps: engine.fps,
             particleCount: engine.particleCount,
             speciesCount: speciesList.length,
             tickTime: engine.tickTime,
             activeLaws: Object.values(engine.lawManager.getAllLaws()).filter(Boolean).length,
+            camX: cam.offsetX || 0,
+            camY: cam.offsetY || 0,
+            camZoom: cam.zoom || 1,
+            gravity: engine.config.gravityStrength || 0,
+            entropy: engine.config.entropy || 0,
+            windX: engine.config.windX || 0,
+            windY: engine.config.windY || 0,
           });
         } catch (e) { /* silently skip HUD update errors */ }
       }, 250);
@@ -330,7 +542,7 @@ if (typeof window !== 'undefined') {
       // Wire reset
       engine.bus.on('ui:reset', () => {
         engine.reset();
-        engine._spawnParticles(engine.config.particleCount);
+        engine._spawnParticles(engine.config.initialCount || engine.config.particleCount);
         ui._rebuildSpeciesUI();
       });
 
