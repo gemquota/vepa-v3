@@ -50,6 +50,24 @@ class Renderer {
     this._debugText.zIndex = 9999;
     this.stage.addChild(this._debugText);
 
+    // Test circle at center
+    this._testCircle = new PIXI.Graphics();
+    this._testCircle.beginFill(0xff4444);
+    this._testCircle.drawCircle(0, 0, 20);
+    this._testCircle.endFill();
+    this._testCircle.x = 100;
+    this._testCircle.y = 100;
+    this.stage.addChild(this._testCircle);
+    
+    // Also test a regular Graphics particle
+    this._testParticle = new PIXI.Graphics();
+    this._testParticle.beginFill(0x44ff44);
+    this._testParticle.drawCircle(0, 0, 5);
+    this._testParticle.endFill();
+    this._testParticle.x = 200;
+    this._testParticle.y = 200;
+    this.stage.addChild(this._testParticle);
+
     // Camera state
     this.camera = {
       x: this.width / 2,
