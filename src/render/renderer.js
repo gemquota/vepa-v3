@@ -50,7 +50,7 @@ class Renderer {
     this._debugText.zIndex = 9999;
     this.stage.addChild(this._debugText);
 
-    // Test circle at center
+    // Test circles
     this._testCircle = new PIXI.Graphics();
     this._testCircle.beginFill(0xff4444);
     this._testCircle.drawCircle(0, 0, 20);
@@ -59,7 +59,6 @@ class Renderer {
     this._testCircle.y = 100;
     this.stage.addChild(this._testCircle);
     
-    // Also test a regular Graphics particle
     this._testParticle = new PIXI.Graphics();
     this._testParticle.beginFill(0x44ff44);
     this._testParticle.drawCircle(0, 0, 5);
@@ -67,6 +66,18 @@ class Renderer {
     this._testParticle.x = 200;
     this._testParticle.y = 200;
     this.stage.addChild(this._testParticle);
+
+    // Create a pool of direct-rendered particle sprites
+    this._directParticles = [];
+    for (let i = 0; i < 50; i++) {
+      const p = new PIXI.Graphics();
+      p.beginFill(0x44aaff);
+      p.drawCircle(0, 0, 4);
+      p.endFill();
+      p.visible = false;
+      this.stage.addChild(p);
+      this._directParticles.push(p);
+    }
 
     // Camera state
     this.camera = {
@@ -128,6 +139,26 @@ class Renderer {
     this.width = width;
     this.height = height;
     this.app.renderer.resize(width, height);
+  }
+
+  /** Render a set of direct test particles from the buffer */
+  renderTestParticles(buffer, count) {
+    const s = { POS_X: 0, POS_Y: 1, POS_Z: 2, RADIUS: 80, ALPHA: 81, DEAD: 74, SPECIES_ID: 7 };
+    const halfW = 400;
+    for (let i = 0; i < Math.min(count, 50); i++) {
+      const base = i * 100;
+      const wx = buffer[base] - (this.camera?.x || 400);
+      const wy = buffer[base + 1] - (this.camera?.y || 400);
+      let sx = wx + halfW;
+      let sy = wy + halfW;
+      if (i < this._directParticles.length) {
+        const p = this._directParticles[i];
+        p.x = sx;
+        p.y = sy;
+        const dead = buffer[base + 74];
+        p.visible = dead < 1;
+      }
+    }
   }
 
   /** Start the render loop (called by main loop). */

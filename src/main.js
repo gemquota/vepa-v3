@@ -225,6 +225,11 @@ class VepaEngine {
       this.renderer.height
     );
 
+    // Diagnostic: render direct test particles
+    if (this.renderer.renderTestParticles) {
+      this.renderer.renderTestParticles(this.particleBuffer, this.particleCount);
+    }
+
     // Render
     this.renderer.render();
 
