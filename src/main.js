@@ -92,7 +92,7 @@ class VepaEngine {
     const speciesList = this.speciesManager.getAllSpecies();
     console.log('[VEPA] Species loaded:', speciesList.length);
 
-    // 2. Init renderer
+    // 2. Init renderer (for canvas container, auto-zoom, interaction)
     this.renderer = new Renderer(
       this.config.container,
       this.config.worldSize,
@@ -100,6 +100,25 @@ class VepaEngine {
     );
     await this.renderer.init();
     console.log('[VEPA] Renderer initialized');
+
+    // 2b. Set up Canvas2D overlay for reliable particle rendering (vepa2 chaos mode)
+    // PixiJS sprites are unreliable on mobile — Canvas2D always works
+    const container = this.config.container;
+    this._canvas2d = document.createElement('canvas');
+    this._canvas2d.id = 'sim-canvas-2d';
+    this._canvas2d.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block;';
+    this._canvas2d.width = container.clientWidth || this.config.worldSize;
+    this._canvas2d.height = container.clientHeight || this.config.worldSize;
+    container.appendChild(this._canvas2d);
+    this._ctx = this._canvas2d.getContext('2d');
+    // Resize with container
+    const resize2d = () => {
+      this._canvas2d.width = container.clientWidth || this.config.worldSize;
+      this._canvas2d.height = container.clientHeight || this.config.worldSize;
+    };
+    window.addEventListener('resize', resize2d);
+    this._resize2d = resize2d;
+    console.log('[VEPA] Canvas2D overlay ready');
 
 
     // 3. Spawn initial particles
@@ -200,29 +219,77 @@ class VepaEngine {
     // Run physics with default dt
     this._tickPhysics(1/60);
 
-    // Camera transform (vepa2-compatible)
+    // Camera transform
     const cam = this.renderer ? this.renderer.getTransform() : { panX: 0, panY: 0, panZ: 0, zoom: 1, rotX: 0, rotY: 0, focalLength: 400 };
 
-    // Update sprites from buffer with camera transform
-    this.renderer.ensurePool(this.particleCount);
-    updateSprites(
-      this.particleBuffer,
-      this.particleCount,
-      this.renderer.sprites,
-      this.config.worldSize,
-      cam.panX,
-      cam.panY,
-      cam.panZ,
-      cam.zoom,
-      cam.rotX,
-      cam.rotY,
-      cam.focalLength,
-      this.renderer.width,
-      this.renderer.height
-    );
+    // Draw particles directly to Canvas2D (bypass PixiJS for reliability)
+    this._drawCanvas2D(cam);
+  }
 
-    // Render stage (PixiJS 8 ticker does not auto-render)
-    this.renderer.render();
+  _drawCanvas2D(cam) {
+    if (!this._canvas2d || !this._ctx) return;
+    const w = this._canvas2d.width, h = this._canvas2d.height;
+    const cX = w / 2, cY = h / 2;
+    const ctx = this._ctx;
+    const s = STRIDE_INDEXES;
+
+    // Clear
+    ctx.fillStyle = '#0a0a12';
+    ctx.fillRect(0, 0, w, h);
+
+    const cosX = Math.cos(cam.rotX || 0), sinX = Math.sin(cam.rotX || 0);
+    const cosY = Math.cos(cam.rotY || 0), sinY = Math.sin(cam.rotY || 0);
+    const zoom = cam.zoom || 1;
+    const fLen = cam.focalLength || 400;
+
+    for (let i = 0; i < Math.min(this.particleCount, 5000); i++) {
+      const base = i * PARTICLE_STRIDE;
+      if (this.particleBuffer[base + s.DEAD] > 0) continue;
+
+      const px = this.particleBuffer[base + s.POS_X];
+      const py = this.particleBuffer[base + s.POS_Y];
+      const pz = this.particleBuffer[base + s.POS_Z];
+
+      // 3D rotation
+      const x1 = px * cosY - pz * sinY;
+      const z1 = px * sinY + pz * cosY;
+      const y2 = py * cosX - z1 * sinX;
+      const z2 = py * sinX + z1 * cosX;
+
+      // Apply pan
+      const wx = x1 + (cam.panX || 0);
+      const wy = y2 + (cam.panY || 0);
+      const wz = z2 + (cam.panZ || 0);
+
+      // Perspective
+      const depth = fLen + wz;
+      if (depth <= 10) continue;
+
+      const pScale = fLen / depth;
+      const sx = cX + wx * pScale * zoom;
+      const sy = cY + wy * pScale * zoom;
+
+      if (sx < -10 || sx > w + 10 || sy < -10 || sy > h + 10) continue;
+
+      // Color
+      const r = Math.floor((this.particleBuffer[base + s.COLOR_R] || 0.5) * 255);
+      const g = Math.floor((this.particleBuffer[base + s.COLOR_G] || 0.5) * 255);
+      const b = Math.floor((this.particleBuffer[base + s.COLOR_B] || 0.5) * 255);
+
+      // Size
+      const mass = this.particleBuffer[base + s.MASS] || 1;
+      const size = Math.max(1, Math.sqrt(mass) * 2 * pScale * zoom);
+
+      ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
+      ctx.fillRect(sx - size/2, sy - size/2, size, size);
+    }
+
+    // HUD overlay
+    ctx.fillStyle = '#88aacc';
+    ctx.font = '10px monospace';
+    ctx.fillText('Particles: ' + this.particleCount, 10, 20);
+    ctx.fillText('FPS: ' + (this.fps || 0), 10, 32);
+    ctx.fillText('Zoom: ' + zoom.toFixed(2), 10, 44);
   }
 
   _tickPhysics(dt) {
