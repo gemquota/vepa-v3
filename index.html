@@ -1,20 +1,424 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VEPA v3: Particle God</title>
-  <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin">
-  <meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp">
-  <link rel="stylesheet" href="./style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>VEPA v3: Particle God</title>
+    <link rel="stylesheet" href="./style.css">
 </head>
-<body>
-  <div id="loading">VEPA v3 — Initializing...</div>
-  <div id="app">
-    <div id="sidebar"></div>
-    <div id="canvas-container"></div>
-    <div id="hud"></div>
-  </div>
-  <script type="module" src="./src/main.js"></script>
-</body>
+<body class="theme-sanguine">
+    <div class="bg-lines"></div>
+
+    <div id="ui-layer">
+        <!-- SIDE PRESET TAB -->
+        <div id="side-tab-anchor" class="side-tab-anchor">
+            <div id="side-bar" class="side-bar menu-chunk chunk-type-side">
+                <div class="bolt t-r"></div><div class="bolt b-r"></div>
+                <div class="chunk-inner side-bar-inner">
+                    <button class="side-btn floppy-btn" onclick="window.togglePresetManager()" title="PRESETS" data-help-key="PRESETS">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                            <path d="M17,3H5C3.89,3 3,3.9 3,5V19C3,20.1 3.89,21 5,21H19C20.1,21 21,20.1 21,19V7L17,3M12,19A3,3 0 0,1 9,16A3,3 0 0,1 12,13A3,3 0 0,1 15,16A3,3 0 0,1 12,19M15,9H5V5H15V9Z" />
+                        </svg>
+                    </button>
+                    <button id="side-bar-toggle" class="side-bar-toggle-btn" onclick="window.toggleQuickPresets()">
+                        <span id="side-bar-arrow">▼</span>
+                    </button>
+                    <div id="quick-presets-container" class="quick-presets-container hidden">
+                        <!-- Numbered buttons 1, 2, 3... -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TOP MENU BAR -->
+        <div id="top-bar-anchor" class="top-bar-anchor">
+            <div id="top-bar" class="playback-bar-container menu-chunk chunk-type-3">
+                <div class="bolt t-l"></div><div class="bolt t-r"></div><div class="bolt b-l"></div><div class="bolt b-r"></div>
+                <div class="chunk-inner playback-bar-inner">
+                    <div class="playback-group time-controls">
+                        <button class="play-btn sq-btn" onclick="window.setPlaybackMode('rewind')" title="Rewind" data-help-key="REWIND">⏪</button>
+                        <button class="play-btn sq-btn" onclick="window.setPlaybackMode('reverse')" title="Reverse" data-help-key="REVERSE">◀</button>
+                        <button class="play-btn sq-btn" onclick="window.togglePause()" id="play-pause-btn" title="Play/Pause" data-help-key="PAUSE">⏸</button>
+                        <button class="play-btn sq-btn" onclick="window.setPlaybackMode('forward')" title="Play" data-help-key="PLAY">▶</button>
+                        <button class="play-btn sq-btn" onclick="window.setPlaybackMode('fastforward')" title="Fast Forward" data-help-key="FASTFORWARD">⏩</button>
+                    </div>
+
+                    <div class="bar-divider"></div>
+
+                    <div class="playback-group util-controls">
+                        <button id="chaos-btn" class="play-btn sq-btn chaos-btn" title="Smart Chaos" data-help-key="SMART_CHAOS">☢️</button>
+                        <button class="play-btn sq-btn refresh-btn" onclick="window.restartSim()" title="Restart Sim" data-help-key="RESTART_SIM">🔄</button>
+                        <button class="play-btn sq-btn reset-btn" onclick="window.hardReset()" title="Hard Reset" data-help-key="HARD_RESET">🗑️</button>
+                        <div id="drone-bay" class="drone-bay">
+                            <div class="bay-inner">
+                                <div class="bay-door top"></div>
+                                <div class="bay-door bottom"></div>
+                                <button id="help-toggle" class="sq-btn help-btn" onclick="window.toggleHelpMode()" title="Help">?</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <button class="rect-min-btn squashed-top-bar" onclick="window.toggleTopBar()">
+                <span class="squash-v">V</span>
+            </button>
+        </div>
+
+        <!-- MAIN PARAMETER DRAWER -->
+        <div id="drawer-container" class="drawer-container">
+            <div id="main-panel" class="panel menu-chunk chunk-type-drawer">
+                <div class="chunk-inner drawer-inner">
+                    <div class="bolt t-l"></div><div class="bolt t-r"></div><div class="bolt b-l"></div><div class="bolt b-r"></div>
+                    <div class="tabs">
+                        <div class="tab-link active" onclick="window.openTab(event, 'tab-world')" data-help-key="WORLD_TAB">WORLD</div>
+                        <div class="tab-link" onclick="window.openTab(event, 'tab-spec')" data-help-key="SPECIES_TAB">SPECIES</div>
+                        <div class="tab-link" onclick="window.openTab(event, 'tab-dna')" data-help-key="DNA_TAB">DNA</div>
+                        <div class="tab-link" onclick="window.openTab(event, 'tab-log')">LOG</div>
+                        <div class="tab-link" onclick="window.openTab(event, 'tab-settings')">SETTINGS</div>
+                    </div>
+
+                    <div id="tab-world" class="tab-content active">
+                        <div class="menu-chunk chunk-type-law-system">
+                            <div class="bolt t-l"></div><div class="bolt t-r"></div>
+                            <div class="bolt b-l"></div><div class="bolt b-r"></div>
+                            <div class="chunk-inner">
+                                <div id="live-law-description" class="live-description-line">
+                                    <span id="desc-category-label" class="desc-label">SYSTEM_STATUS:</span> <span id="active-law-desc" class="desc-text">Select a law for parameters...</span>
+                                </div>
+
+                                <div class="grid-controls-row-condensed">
+                                    <div class="category-tabs">
+                                        <div class="cat-tab active" onclick="window.toggleCategoryFilter('cat-phys', this)" data-cat="cat-phys">PHYS</div>
+                                        <div class="cat-tab active" onclick="window.toggleCategoryFilter('cat-biol', this)" data-cat="cat-biol">BIOL</div>
+                                        <div class="cat-tab active" onclick="window.toggleCategoryFilter('cat-chem', this)" data-cat="cat-chem">CHEM</div>
+                                        <div class="cat-tab active" onclick="window.toggleCategoryFilter('cat-thermo', this)" data-cat="cat-thermo">THERMO</div>
+                                        <div class="cat-tab active" onclick="window.toggleCategoryFilter('cat-meta', this)" data-cat="cat-meta">META</div>
+                                    </div>
+                                    <div class="grid-util-group">
+                                        <button id="info-module-toggle" class="sq-btn db-toggle-btn" onclick="window.toggleInfoModule()" title="DATABASE">DB</button>
+                                        <button id="grid-scale-btn" class="sq-btn scale-state-btn" onclick="window.cycleGridScale()">
+                                            <span class="scale-icon">□</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div id="law-icon-grid" class="toggle-grid icon-grid scale-standard">
+                                    <div class="sq-toggle icon-only cat-phys" id="syn-grav" onclick="window.handleLawClick('grav', 'GRAV', event)" title="GRAVITY"></div>
+                                    <div class="sq-toggle icon-only cat-phys" id="syn-drag" onclick="window.handleLawClick('drag', 'DRAG', event)" title="DRAG"></div>
+                                    <div class="sq-toggle icon-only cat-phys" id="syn-jitter" onclick="window.handleLawClick('jitter', 'ENTR', event)" title="ENTROPY"></div>
+                                    <div class="sq-toggle icon-only cat-phys" id="syn-wrap" onclick="window.handleLawClick('wrap', 'WRAP', event)" title="WRAP"></div>
+                                    <div class="sq-toggle icon-only cat-phys" id="syn-coll" onclick="window.handleLawClick('coll', 'COLL', event)" title="COLLISION"></div>
+                                    <div class="sq-toggle icon-only cat-phys" id="syn-accr" onclick="window.handleLawClick('accr', 'ACCR', event)" title="ACCRETION"></div>
+                                    <div class="sq-toggle icon-only cat-phys" id="syn-planetary" onclick="window.handleLawClick('planetary', 'PLANET', event)" title="PLANETARY"></div>
+                                    <div class="sq-toggle icon-only cat-phys" id="syn-void" onclick="window.handleLawClick('void', 'VOID', event)" title="VOID"></div>
+                                    <div class="sq-toggle icon-only cat-phys" id="syn-bond" onclick="window.handleLawClick('bond', 'BOND', event)" title="BOND"></div>
+                                    
+                                    <div class="sq-toggle icon-only cat-biol" id="syn-life" onclick="window.handleLawClick('life', 'BIOL', event)" title="LIFE"></div>
+                                    <div class="sq-toggle icon-only cat-biol" id="syn-glow" onclick="window.handleLawClick('glow', 'GLOW', event)" title="GLOW"></div>
+                                    <div class="sq-toggle icon-only cat-biol" id="syn-affinity" onclick="window.handleLawClick('affinity', 'Species Affinity', event)" title="AFFINITY"></div>
+                                    <div class="sq-toggle icon-only cat-biol" id="syn-reproduction" onclick="window.handleLawClick('reproduction', 'Birth Rate', event)" title="REPRO"></div>
+                                    <div class="sq-toggle icon-only cat-biol" id="syn-tracking" onclick="window.handleLawClick('tracking', 'Signal Resp', event)" title="TRACK"></div>
+                                    <div class="sq-toggle icon-only cat-biol" id="syn-senescence" onclick="window.handleLawClick('senescence', 'Death Rate', event)" title="SENES"></div>
+                                    <div class="sq-toggle icon-only cat-biol" id="syn-ener" onclick="window.handleLawClick('ener', 'ENER', event)" title="ENERGY"></div>
+                                    <div class="sq-toggle icon-only cat-biol" id="syn-rad" onclick="window.handleLawClick('rad', 'RAD', event)" title="RADIATION"></div>
+                                    <div class="sq-toggle icon-only cat-biol" id="syn-genotype" onclick="window.handleLawClick('genotype', 'Mutation', event)" title="GENO"></div>
+                                    <div class="sq-toggle icon-only cat-biol" id="syn-phenotype" onclick="window.handleLawClick('phenotype', 'C2 (Alpha)', event)" title="PHENO"></div>
+                                    
+                                    <div class="sq-toggle icon-only cat-chem" id="syn-cata" onclick="window.handleLawClick('cata', 'CATA', event)" title="CATA"></div>
+                                    <div class="sq-toggle icon-only cat-chem" id="syn-solv" onclick="window.handleLawClick('solv', 'SOLV', event)" title="SOLV"></div>
+                                    <div class="sq-toggle icon-only cat-chem" id="syn-acid" onclick="window.handleLawClick('acid', 'ACID', event)" title="ACID"></div>
+                                    <div class="sq-toggle icon-only cat-chem" id="syn-oxid" onclick="window.handleLawClick('oxid', 'OXID', event)" title="OXID"></div>
+                                    <div class="sq-toggle icon-only cat-chem" id="syn-redu" onclick="window.handleLawClick('redu', 'REDU', event)" title="REDU"></div>
+                                    <div class="sq-toggle icon-only cat-chem" id="syn-poly" onclick="window.handleLawClick('poly', 'POLY', event)" title="POLY"></div>
+                                    <div class="sq-toggle icon-only cat-chem" id="syn-isom" onclick="window.handleLawClick('isom', 'ISOM', event)" title="ISOM"></div>
+                                    <div class="sq-toggle icon-only cat-chem" id="syn-chir" onclick="window.handleLawClick('chir', 'CHIR', event)" title="CHIR"></div>
+                                    <div class="sq-toggle icon-only cat-chem" id="syn-crys" onclick="window.handleLawClick('crys', 'CRYS', event)" title="CRYS"></div>
+                                    <div class="sq-toggle icon-only cat-chem" id="syn-allo" onclick="window.handleLawClick('allo', 'ALLO', event)" title="ALLO"></div>
+                                    
+                                    <div class="sq-toggle icon-only cat-thermo" id="syn-heat" onclick="window.handleLawClick('heat', 'HEAT', event)" title="HEAT"></div>
+                                    <div class="sq-toggle icon-only cat-thermo" id="syn-cold" onclick="window.handleLawClick('cold', 'COLD', event)" title="COLD"></div>
+                                    <div class="sq-toggle icon-only cat-thermo" id="syn-conv" onclick="window.handleLawClick('conv', 'CONV', event)" title="CONV"></div>
+                                    <div class="sq-toggle icon-only cat-thermo" id="syn-radi" onclick="window.handleLawClick('radi', 'RADI', event)" title="RADI"></div>
+                                    <div class="sq-toggle icon-only cat-thermo" id="syn-subl" onclick="window.handleLawClick('subl', 'SUBL', event)" title="SUBL"></div>
+                                    <div class="sq-toggle icon-only cat-thermo" id="syn-melt" onclick="window.handleLawClick('melt', 'MELT', event)" title="MELT"></div>
+                                    <div class="sq-toggle icon-only cat-thermo" id="syn-boil" onclick="window.handleLawClick('boil', 'BOIL', event)" title="BOIL"></div>
+                                    <div class="sq-toggle icon-only cat-thermo" id="syn-cond" onclick="window.handleLawClick('cond', 'COND', event)" title="COND"></div>
+                                    <div class="sq-toggle icon-only cat-thermo" id="syn-depo" onclick="window.handleLawClick('depo', 'DEPO', event)" title="DEPO"></div>
+                                    <div class="sq-toggle icon-only cat-thermo" id="syn-exop" onclick="window.handleLawClick('exop', 'EXOP', event)" title="EXOP"></div>
+                                    
+                                    <div class="sq-toggle icon-only cat-meta" id="syn-time" onclick="window.handleLawClick('time', 'TIME', event)" title="TIME"></div>
+                                    <div class="sq-toggle icon-only cat-meta" id="syn-dime" onclick="window.handleLawClick('dime', 'DIME', event)" title="DIME"></div>
+                                    <div class="sq-toggle icon-only cat-meta" id="syn-chao" onclick="window.handleLawClick('chao', 'CHAO', event)" title="CHAO"></div>
+                                    <div class="sq-toggle icon-only cat-meta" id="syn-orde" onclick="window.handleLawClick('orde', 'ORDE', event)" title="ORDE"></div>
+                                    <div class="sq-toggle icon-only cat-meta" id="syn-fate" onclick="window.handleLawClick('fate', 'FATE', event)" title="FATE"></div>
+                                    <div class="sq-toggle icon-only cat-meta" id="syn-will" onclick="window.handleLawClick('will', 'WILL', event)" title="WILL"></div>
+                                    <div class="sq-toggle icon-only cat-meta" id="syn-soul" onclick="window.handleLawClick('soul', 'SOUL', event)" title="SOUL"></div>
+                                    <div class="sq-toggle icon-only cat-meta" id="syn-mind" onclick="window.handleLawClick('mind', 'MIND', event)" title="MIND"></div>
+                                    <div class="sq-toggle icon-only cat-meta" id="syn-tele" onclick="window.handleLawClick('tele', 'TELE', event)" title="TELE"></div>
+                                    <div class="sq-toggle icon-only cat-meta" id="syn-clai" onclick="window.handleLawClick('clai', 'CLAI', event)" title="CLAI"></div>
+                                    <div class="sq-toggle icon-only cat-meta" id="syn-preo" onclick="window.handleLawClick('preo', 'PREO', event)" title="PREO"></div>
+                                    <div class="sq-toggle icon-only cat-meta" id="syn-astr" onclick="window.handleLawClick('astr', 'ASTR', event)" title="ASTR"></div>
+                                </div>
+
+                                <div id="info-module" class="info-module-container hidden" style="margin-top: 15px;"></div>
+                            </div>
+                        </div>
+
+
+                        <div id="world-accordion" class="main-accordion" style="margin-top: 10px;"></div>
+                    </div>
+
+                    <div id="tab-spec" class="tab-content">
+                        <div class="species-controls-header">
+                            <button class="btn tiny-btn" onclick="window.addSpecies()">+ SPECIES</button>
+                            <div class="selection-tools">
+                                <label class="checkbox-container">
+                                    <input type="checkbox" id="selection-mode-toggle" onchange="window.toggleSelectionMode(this.checked)">
+                                    <span class="checkmark"></span> SEL_MODE
+                                </label>
+                                <button class="btn tiny-btn" onclick="window.selectAllSpecies()">ALL</button>
+                            </div>
+                        </div>
+                        <div id="species-list" class="condensed-list"></div>
+                        <div id="dna-accordion" class="main-accordion"></div>
+                    </div>
+
+                    <div id="tab-dna" class="tab-content">
+                        <div id="dna-analytics-container" class="dna-analytics-container">
+                            <!-- DNA Stats will be rendered here -->
+                        </div>
+                        <div id="dna-graphs-container" class="dna-graphs-container" style="margin-top:20px; padding: 0 15px 15px 15px;">
+                            <h3 style="margin-bottom:10px; font-size: 10px; color: var(--red-bright); letter-spacing: 2px;">POPULATION_TRENDS</h3>
+                            <canvas id="pop-line-graph" style="background:#000; border:1px solid #222; width:100%; height:120px; display:block;"></canvas>
+                            <h3 style="margin-top:20px; margin-bottom:10px; font-size: 10px; color: var(--red-bright); letter-spacing: 2px;">STATE_SCATTER [MASS/NRG]</h3>
+                            <canvas id="mass-nrg-scatter" style="background:#000; border:1px solid #222; width:100%; height:150px; display:block;"></canvas>
+                        </div>
+                    </div>
+
+                    <div id="tab-log" class="tab-content">
+                        <div id="narrative-log" class="condensed-log"></div>
+                    </div>
+
+                    <div id="tab-settings" class="tab-content">
+                        <div class="settings-group-header">CAMERA CONTROL</div>
+                        <div class="settings-group">
+                            <select id="camera-mode-select" class="preset-input" onchange="window.updateWorld('cameraMode', this.value)" style="margin-bottom: 15px;">
+                                <option value="panning">MODE: 1-FINGER PAN / 2-FINGER ROTATE</option>
+                                <option value="orbital">MODE: 1-FINGER ROTATE / 2-FINGER PAN</option>
+                            </select>
+                        </div>
+
+                        <div class="settings-group-header">FACTORY OPTIONS</div>
+                        <div class="settings-group">
+                            <button class="btn" style="width:100%; margin-bottom: 10px;" onclick="window.hardReset()">FACTORY_RESET</button>
+                        </div>
+
+                        <div class="settings-group-header">PRESETS</div>
+                        <div class="settings-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <button class="btn" onclick="window.openSavePresetDialog()">SAVE_NEW</button>
+                            <button class="btn" onclick="window.openLoadPresetDialog()">LOAD_PRESET</button>
+                        </div>
+                        <div id="presets-list-inline" class="condensed-list" style="margin-top: 15px; border-top: 1px solid #222;"></div>
+                    </div>
+                </div>
+                <div id="drawer-resize-handle" class="resize-handle"></div>
+            </div>
+            
+            <!-- Persistent Drawer Minimize Button -->
+            <button class="rect-min-btn squashed-drawer" onclick="window.toggleMainPanel()">
+                <span class="squash-v">V</span>
+            </button>
+        </div>
+
+        <div id="insight-panel" class="insight-panel"></div>
+        <div id="suggestions-panel" class="suggestions-panel"></div>
+        <div id="proposal-panel" class="proposal-panel hidden"></div>
+        <div id="narrative-panel" class="narrative-panel"></div>
+
+        <!-- DIALOGS -->
+        <div id="preset-load-dialog" class="preset-dialog hidden">
+            <div class="preset-dialog-inner">
+                <div class="preset-dialog-header">
+                    <span>LOAD_PRESET_v2.0</span>
+                    <span class="p-info-close" onclick="window.closeLoadPresetDialog()" style="cursor:pointer; color:#666;">[X]</span>
+                </div>
+                <div id="load-preset-list" class="preset-list"></div>
+                <div class="settings-group-header">COMPONENT_ROUTING</div>
+                <div id="category-selection-grid" class="category-selection-list">
+                    <!-- Categories will be rendered here -->
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <span style="font-size: 8px; color: #444; font-family: monospace;">[2TAP: EXCLUSIVE_SEL]</span>
+                    <button class="btn tiny-btn" onclick="window.selectAllPresetCategories()">SELECT ALL</button>
+                </div>
+                <div class="preset-actions">
+                    <button class="btn-preset" onclick="window.closeLoadPresetDialog()">ABORT</button>
+                    <button class="btn-preset primary" onclick="window.confirmLoadPreset()">EXECUTE_LOAD</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="preset-save-dialog" class="preset-dialog hidden" style="height: auto;">
+            <div class="preset-dialog-inner">
+                <div class="preset-dialog-header">
+                    <span>COMMIT_NEW_PRESET</span>
+                    <span class="p-info-close" onclick="window.closeSavePresetDialog()" style="cursor:pointer; color:#666;">[X]</span>
+                </div>
+                <div class="settings-group-header">IDENTIFIER</div>
+                <input type="text" id="preset-name-input" class="preset-input" placeholder="ENTER_PRESET_NAME..." autocomplete="off">
+                <div class="preset-actions">
+                    <button class="btn-preset" onclick="window.closeSavePresetDialog()">CANCEL</button>
+                    <button class="btn-preset primary" onclick="window.confirmSavePreset()">SAVE_STATE</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="selective-chaos-dialog" class="preset-dialog hidden" style="height: auto;">
+            <div class="preset-dialog-inner">
+                <div class="preset-dialog-header">
+                    <span>SELECTIVE_ENTROPY</span>
+                    <span class="p-info-close" onclick="window.closeSelectiveChaos()" style="cursor:pointer; color:#666;">[X]</span>
+                </div>
+                <div class="settings-group-header">TARGET_SYSTEMS</div>
+                <div class="chaos-options-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
+                    <button class="btn" onclick="window.triggerSmartChaos({dna: true}); window.closeSelectiveChaos()">CHAOS: DNA</button>
+                    <button class="btn" onclick="window.triggerSmartChaos({biology: true}); window.closeSelectiveChaos()">CHAOS: BIOL</button>
+                    <button class="btn" onclick="window.triggerSmartChaos({physics: true}); window.closeSelectiveChaos()">CHAOS: PHYS</button>
+                    <button class="btn danger" onclick="window.triggerSmartChaos({total: true}); window.closeSelectiveChaos()">!!! TOTAL !!!</button>
+                </div>
+                <div class="preset-actions">
+                    <button class="btn-preset" onclick="window.closeSelectiveChaos()">ABORT</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="chaos-menu-dialog" class="preset-dialog hidden" style="height: auto;">
+            <div class="preset-dialog-inner">
+                <div class="preset-dialog-header">
+                    <span>CHAOS_GRID_MODE</span>
+                    <span class="p-info-close" onclick="window.closeChaosMenu()" style="cursor:pointer; color:#666;">[X]</span>
+                </div>
+                <div class="settings-group-header">GRID_LAYOUT (e.g. 3x5)</div>
+                <input type="text" id="chaos-sim-count-input" class="preset-input" value="3x5" placeholder="3x5">
+                <div class="preset-actions">
+                    <button class="btn-preset" onclick="window.closeChaosMenu()">CANCEL</button>
+                    <button class="btn-preset primary" onclick="window.confirmChaosMenu()">EXECUTE</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- FULLSCREEN PRESET MANAGER -->
+        <div id="preset-manager" class="fullscreen-overlay hidden">
+            <div id="archive-chunk" class="menu-chunk chunk-type-archive">
+                <div class="bolt t-l"></div><div class="bolt t-r"></div><div class="bolt b-l"></div><div class="bolt b-r"></div>
+                <div class="chunk-inner archive-content">
+                    <div class="archive-header">
+                        <div class="header-left">
+                            <span class="header-tag">SYSTEM</span>
+                            <span class="header-title">PRESETS</span>
+                        </div>
+                        <button class="close-overlay-btn" onclick="window.togglePresetManager()">CLOSE_PRESETS [ESC]</button>
+                    </div>
+                    
+                    <div class="archive-body">
+                        <!-- LEFT: LIST -->
+                        <div class="archive-list-pane">
+                            <div class="pane-header">STATES</div>
+                            <div id="archive-list" class="archive-list-content"></div>
+                            <div class="archive-actions" style="padding:10px 0 0 0; border-top:1.5px solid #222;">
+                                <button class="btn-sci-fi" onclick="window.openSavePresetDialog()" style="width:100%;">SAVE_NEW</button>
+                            </div>
+                        </div>
+
+                        <!-- RIGHT: INFO & PREVIEW -->
+                        <div class="archive-right-pane">
+                            <div class="archive-details-pane">
+                                <div class="pane-header">DETAILS</div>
+                                <div id="archive-details" class="archive-details-content">
+                                    <div class="no-selection-msg" style="padding:40px; text-align:center; opacity:0.3; font-size:11px;">[SELECT_ENTRY_FOR_DECRYPTION]</div>
+                                </div>
+                            </div>
+
+                            <div class="archive-preview-pane">
+                                <div class="pane-header">PREVIEW // ANALYTICS</div>
+                                <div class="preview-container">
+                                    <canvas id="preview-canvas"></canvas>
+                                    <div class="preview-overlay">
+                                        <div class="scanline"></div>
+                                    </div>
+                                </div>
+                                
+                                <div class="routing-options">
+                                    <div class="pane-header" style="margin-top:0;">DATA_ROUTING</div>
+                                    <div id="archive-category-grid" class="category-selection-list" style="margin-bottom:10px;"></div>
+                                    <button class="btn-sci-fi secondary" style="width:100%; font-size:9px; padding:8px;" onclick="window.selectAllPresetCategories()">SELECT ALL</button>
+                                </div>
+
+                                <div class="archive-actions">
+                                    <button class="btn-sci-fi load-btn" style="width:100%;" onclick="window.confirmLoadPreset()">EXECUTE_LOAD</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="timeline-container" class="timeline-container">
+
+            <div id="timeline-label" class="timeline-label">LIVE</div>
+        </div>
+
+        <!-- PARTICLE INFO PANEL -->
+        <div id="particle-info-panel" class="particle-info-panel menu-chunk hidden">
+            <div class="bolt t-l"></div><div class="bolt t-r"></div><div class="bolt b-l"></div><div class="bolt b-r"></div>
+            <div class="chunk-inner">
+                <div class="particle-info-header">
+                    <span id="p-info-species">SPECIES</span>
+                    <span class="p-info-close" onclick="window.engine.selectedParticleIndex = -1; document.getElementById('particle-info-panel').classList.add('hidden');">[X]</span>
+                </div>
+                <div class="particle-info-grid">
+                    <div class="p-info-item"><label>MASS</label><span id="p-info-mass">0</span></div>
+                    <div class="p-info-item"><label>AGE</label><span id="p-info-age">0</span></div>
+                    <div class="p-info-item"><label>NRG</label><span id="p-info-energy">0</span></div>
+                    <div class="p-info-item"><label>VEL</label><span id="p-info-vel">0</span></div>
+                </div>
+                <div class="p-info-pos">POS: <span id="p-info-pos">0, 0, 0</span></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="zoom-hud">FPS: <span id="fps">0</span> | POP: <span id="p-alive">0</span>/<span id="p-max">0</span> | S: <span id="sim-step">0</span></div>
+    <div id="help-drone" class="help-drone hidden" style="left: 90%; top: 50px;">
+        <div class="drone-body-core"></div>
+        <div class="drone-rotor tl"><div class="blade"></div></div>
+        <div class="drone-rotor tr"><div class="blade"></div></div>
+        <div class="drone-rotor bl"><div class="blade"></div></div>
+        <div class="drone-rotor br"><div class="blade"></div></div>
+        <div class="drone-eye"></div>
+        <div class="drone-thruster"></div>
+    </div>
+    <div id="drone-speech" class="drone-speech hidden"></div>
+    <svg id="drone-laser-overlay" style="position:fixed; inset:0; z-index:5350; pointer-events:none; width:100%; height:100%;">
+        <line id="drone-laser" x1="0" y1="0" x2="0" y2="0" stroke="rgba(0, 255, 255, 0.8)" stroke-width="2" stroke-linecap="round" class="hidden" />
+        <line id="drone-connection" x1="0" y1="0" x2="0" y2="0" stroke="rgba(0, 255, 255, 0.5)" stroke-width="1" stroke-dasharray="4 2" class="hidden" />
+    </svg>
+    <div id="tooltip" class="hidden"></div>
+    <div id="help-panel" class="help-panel hidden"></div>
+
+    <div id="codex-overlay" class="fullscreen-overlay hidden" style="z-index: 5000; background: rgba(0,0,0,0.95);">
+        <button class="close-overlay-btn" onclick="window.closeCodex()">CLOSE_DATABASE [ESC]</button>
+        <iframe id="codex-iframe" src="about:blank" style="width:100%; height:100%; border:none;"></iframe>
+    </div>
+
+    <div id="chaos-grid-overlay" class="fullscreen-overlay hidden" style="z-index: 50; background: #000; pointer-events: none !important;">
+        <div style="position: absolute; top: 10px; right: 10px; z-index: 6001; display: flex; gap: 10px; pointer-events: auto;">
+            <button class="close-overlay-btn" onclick="window.rerollChaosGrid()">REROLL [R]</button>
+            <button class="close-overlay-btn" onclick="window.closeChaosGrid()">CLOSE_MULTIPLEX [ESC]</button>
+        </div>
+        <div id="chaos-grid-container" style="display: grid; width: 100%; height: 100%; gap: 2px; padding: 40px 10px 10px 10px; box-sizing: border-box; pointer-events: none;"></div>
+    </div>
+
+    <script type="module" src="./src/main.js"></script></body>
 </html>
+>
