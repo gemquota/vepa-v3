@@ -11,7 +11,7 @@ import SpeciesManager from './species/speciesManager.js';
 import LawManager from './physics/laws.js';
 import SpatialGrid from './physics/spatialGrid.js';
 import {
-  PARTICLE_STRIDE, MAX_PARTICLES, STRIDE_INDEXES,
+  PARTICLE_STRIDE, MAX_PARTICLES, STRIDE_INDEXES, DNA_RANGES,
   LAW_INDEXES, DEFAULT_SPECIES, LAW_CATEGORIES,
 } from './constants.js';
 
@@ -120,70 +120,57 @@ class VepaEngine {
     if (speciesList.length === 0) return;
     const cfg = this.config;
     const ws = cfg.worldSize;
-    const cx = ws * (cfg.distributionCenterX || 0.5);
-    const cy = ws * (cfg.distributionCenterY || 0.5);
-    const cz = ws * (cfg.distributionCenterZ || 0.5);
-    const sx = (cfg.spreadX || 0.8) * ws;
-    const sy = (cfg.spreadY || 0.8) * ws;
-    const sz = (cfg.spreadZ || 0.5) * ws;
+    const half = ws / 2;
+    const spreadX = cfg.spreadX || 1.0;
+    const spreadY = cfg.spreadY || 1.0;
+    const spreadZ = cfg.spreadZ || 1.0;
+    const distType = cfg.distributionType || 'Grid';
 
     for (let i = 0; i < Math.min(count, MAX_PARTICLES); i++) {
       const base = i * PARTICLE_STRIDE;
-      let px, py, pz;
+      let px = 0, py = 0, pz = 0;
 
-      // First particle always at world center (debug)
-      if (i === 0) {
-        px = ws / 2;
-        py = ws / 2;
-        pz = ws / 2;
-        bufferSet(this.particleBuffer, base + s.MASS, 5.0); // Make it big
-        bufferSet(this.particleBuffer, base + s.RADIUS, 10); // Big radius
-      } else {
-      // Position based on distribution type
-      const dist = cfg.distributionType || 'Grid';
-      if (dist === 'Grid') {
-        const cols = Math.ceil(Math.sqrt(count));
-        const row = Math.floor(i / cols);
-        const col = i % cols;
-        px = (col / cols) * ws;
-        py = (row / cols) * ws;
-        pz = cz + this.prng.range(-sz/2, sz/2);
-      } else if (dist === 'Big Bang') {
+      // Position based on distribution type (centered coords like vepa2: -half to +half)
+      if (distType === 'Soup') {
+        px = (this.prng.nextFloat() - 0.5) * ws * spreadX;
+        py = (this.prng.nextFloat() - 0.5) * ws * spreadY;
+        pz = (this.prng.nextFloat() - 0.5) * ws * spreadZ;
+      } else if (distType === 'Big Bang') {
         const angle = this.prng.nextFloat() * Math.PI * 2;
-        const radius = this.prng.nextFloat() * ws * 0.4;
-        px = cx + Math.cos(angle) * radius;
-        py = cy + Math.sin(angle) * radius;
-        pz = cz + this.prng.range(-sz/2, sz/2);
-      } else if (dist === 'Bipolar') {
+        const radius = this.prng.nextFloat() * half * 0.4;
+        px = Math.cos(angle) * radius;
+        py = Math.sin(angle) * radius;
+        pz = (this.prng.nextFloat() - 0.5) * ws * 0.1 * spreadZ;
+      } else if (distType === 'Bipolar') {
         const pole = this.prng.nextFloat() > 0.5 ? 1 : -1;
+        px = pole * half * 0.4 * spreadX + (this.prng.nextFloat() - 0.5) * 50;
+        py = (this.prng.nextFloat() - 0.5) * ws * spreadY;
+        pz = (this.prng.nextFloat() - 0.5) * ws * spreadZ;
+      } else if (distType === 'Galaxy') {
         const angle = this.prng.nextFloat() * Math.PI * 2;
-        const radius = this.prng.nextFloat() * sx * 0.3;
-        px = cx + Math.cos(angle) * radius + pole * sx * 0.3;
-        py = cy + Math.sin(angle) * radius;
-        pz = cz + pole * sz * 0.3;
-      } else if (dist === 'Galaxy') {
-        const arm = Math.floor(this.prng.nextFloat() * 3);
-        const angle = this.prng.nextFloat() * Math.PI * 2 + arm * Math.PI * 2/3;
-        const radius = this.prng.nextFloat() * sx * 0.4;
-        px = cx + Math.cos(angle) * radius;
-        py = cy + Math.sin(angle) * radius;
-        pz = cz + this.prng.range(-sz/4, sz/4);
-      } else {
-        // Soup (uniform random)
-        px = this.prng.range(0, ws);
-        py = this.prng.range(0, ws);
-        pz = this.prng.range(0, ws);
-      }
+        const r = Math.sqrt(this.prng.nextFloat()) * half * 0.5 * spreadX;
+        px = Math.cos(angle) * r;
+        py = Math.sin(angle) * r;
+        pz = (this.prng.nextFloat() - 0.5) * ws * 0.1 * spreadZ;
+      } else { // Grid (default)
+        const side = Math.ceil(Math.cbrt(count));
+        const gx = i % side;
+        const gy = Math.floor(i / side) % side;
+        const gz = Math.floor(i / (side * side));
+        const spacing = ws / side;
+        px = (gx - (side - 1) / 2) * spacing;
+        py = (gy - (side - 1) / 2) * spacing;
+        pz = (gz - (side - 1) / 2) * spacing;
       }
 
-      bufferSet(this.particleBuffer, base + s.POS_X, ((px % ws) + ws) % ws);
-      bufferSet(this.particleBuffer, base + s.POS_Y, ((py % ws) + ws) % ws);
-      bufferSet(this.particleBuffer, base + s.POS_Z, ((pz % ws) + ws) % ws);
+      bufferSet(this.particleBuffer, base + s.POS_X, px);
+      bufferSet(this.particleBuffer, base + s.POS_Y, py);
+      bufferSet(this.particleBuffer, base + s.POS_Z, pz);
 
       // Small random velocity
-      bufferSet(this.particleBuffer, base + s.VEL_X, this.prng.range(-0.5, 0.5));
-      bufferSet(this.particleBuffer, base + s.VEL_Y, this.prng.range(-0.5, 0.5));
-      bufferSet(this.particleBuffer, base + s.VEL_Z, this.prng.range(-0.5, 0.5));
+      bufferSet(this.particleBuffer, base + s.VEL_X, (this.prng.nextFloat() - 0.5) * 2);
+      bufferSet(this.particleBuffer, base + s.VEL_Y, (this.prng.nextFloat() - 0.5) * 2);
+      bufferSet(this.particleBuffer, base + s.VEL_Z, (this.prng.nextFloat() - 0.5) * 2);
 
       // Assign species round-robin
       const species = speciesList[i % speciesList.length];
@@ -195,10 +182,17 @@ class VepaEngine {
       bufferSet(this.particleBuffer, base + s.AGE, 0);
       bufferSet(this.particleBuffer, base + s.DEAD, 0);
 
+      // Cache DNA in particle buffer (unpack from Uint16 to float)
+      for (let d = 0; d < 42; d++) {
+        const raw = species.dna ? species.dna[d] : 0;
+        const range = DNA_RANGES[d];
+        const val = range ? range.min + (raw / 65535) * (range.max - range.min) : raw;
+        bufferSet(this.particleBuffer, base + s.DNA_CACHE_START + d, val);
+      }
+
       // Phenotype
       expressPhenotype(this.particleBuffer, i, species.id);
     }
-
     this.particleCount = Math.min(count, MAX_PARTICLES);
   }
 
@@ -207,7 +201,7 @@ class VepaEngine {
     this._tickPhysics(1/60);
 
     // Camera transform (vepa2-compatible)
-    const cam = this.renderer ? this.renderer.getTransform() : { panX: 400, panY: 400, panZ: 0, zoom: 1, rotX: 0, rotY: 0, focalLength: 400 };
+    const cam = this.renderer ? this.renderer.getTransform() : { panX: 0, panY: 0, panZ: 0, zoom: 1, rotX: 0, rotY: 0, focalLength: 400 };
 
     // Update sprites from buffer with camera transform
     this.renderer.ensurePool(this.particleCount);
@@ -226,6 +220,9 @@ class VepaEngine {
       this.renderer.width,
       this.renderer.height
     );
+
+    // Render stage (PixiJS 8 ticker does not auto-render)
+    this.renderer.render();
   }
 
   _tickPhysics(dt) {
@@ -459,7 +456,10 @@ class VepaEngine {
   _toroidalAdd(offset, delta) {
     const v = bufferGet(this.particleBuffer, offset) + delta;
     const size = this.config.worldSize;
-    const wrapped = ((v % size) + size) % size;
+    const half = size / 2;
+    // Wrap to centered coordinate range [-half, +half)
+    let wrapped = ((v % size) + size) % size;
+    if (wrapped >= half) wrapped -= size;
     bufferSet(this.particleBuffer, offset, wrapped);
   }
 

@@ -65,9 +65,11 @@ class Renderer {
           this.height = height;
           this.app.renderer.resize(width, height);
           if (this._centerOnWorld) {
-            this.pan.x = this.worldSize / 2;
-            this.pan.y = this.worldSize / 2;
+            // Particles at centered coords (-half..+half), so camera at (0,0,0)
+            this.pan.x = 0;
+            this.pan.y = 0;
             this.pan.z = 0;
+            // Auto-zoom to fit world in viewport (important for mobile)
             const zoomX = this.width / this.worldSize;
             const zoomY = this.height / this.worldSize;
             this.zoom = Math.min(zoomX, zoomY, 2);
@@ -142,8 +144,8 @@ class Renderer {
     // Keyboard: R to reset
     this._keyHandler = (e) => {
       if (e.key === 'r' || e.key === 'R') {
-        this.pan.x = this.worldSize / 2;
-        this.pan.y = this.worldSize / 2;
+        this.pan.x = 0;
+        this.pan.y = 0;
         this.pan.z = 0;
         this.zoom = 1.0;
         this.rotation.x = 0;

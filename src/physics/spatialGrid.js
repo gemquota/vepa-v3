@@ -32,7 +32,10 @@ class SpatialGrid {
    * Toroidal wrapping.
    */
   _toCell(v) {
-    let c = Math.floor(v / this.cellSize);
+    const half = this.worldSize / 2;
+    // Shift from centered range [-half, +half) to [0, worldSize)
+    const shifted = v + half;
+    let c = Math.floor(shifted / this.cellSize);
     if (c < 0) c += GRID_SIZE * Math.ceil(-c / GRID_SIZE);
     return ((c % GRID_SIZE) + GRID_SIZE) % GRID_SIZE;
   }
