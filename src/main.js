@@ -430,10 +430,10 @@ class VepaEngine {
       if (!isFinite(fy)) fy = 0;
       if (!isFinite(fz)) fz = 0;
 
-      // Integrate velocity
-      addTo(this.particleBuffer, base + s.VEL_X, fx * invMass * dtScaled);
-      addTo(this.particleBuffer, base + s.VEL_Y, fy * invMass * dtScaled);
-      addTo(this.particleBuffer, base + s.VEL_Z, fz * invMass * dtScaled);
+      // Integrate velocity (vepa2-style: accumulate F/m, position uses dt)
+      addTo(this.particleBuffer, base + s.VEL_X, fx * invMass);
+      addTo(this.particleBuffer, base + s.VEL_Y, fy * invMass);
+      addTo(this.particleBuffer, base + s.VEL_Z, fz * invMass);
 
       // Integrate position (toroidal)
       this._toroidalAdd(base + s.POS_X, bufferGet(this.particleBuffer, base + s.VEL_X) * dtScaled);
