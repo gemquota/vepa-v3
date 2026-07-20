@@ -115,10 +115,19 @@ class VepaEngine {
             this.canvas.addEventListener('pointerdown', onPointerDown);
             this.canvas.addEventListener('pointerup', onPointerUp);
 
-            // Listen for derived parameters from parent
+            // Listen for commands from parent
             window.addEventListener('message', (e) => {
                 if (e.data && e.data.type === 'chaos:derive') {
                     this.receiveDerivedState(e.data.data);
+                }
+                if (e.data && e.data.type === 'chaos:request-state') {
+                    try { window.parent.postMessage({ type: 'chaos:state-snapshot', data: {
+                        laws: JSON.parse(JSON.stringify(this.laws)),
+                        worldConfig: JSON.parse(JSON.stringify(this.worldConfig)),
+                        species: this.species.map(s => ({ 
+                            name: s.name, dna: [...s.dna], rgb: [...s.rgb], color: s.color, id: s.id 
+                        }))
+                    }}, '*'); } catch(ex) {}
                 }
             });
 
