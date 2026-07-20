@@ -35,7 +35,7 @@ class VepaEngine {
             meta: { time: true, dime: false, chao: true, orde: true, fate: false, will: true, soul: true, mind: true, tele: false, clai: true, preo: true, astr: true }
         };
         this.worldConfig = { 
-            count: 3000, initialCount: 2000, dimX: 2000, dimY: 2000, dimZ: 2000, 
+            count: 3000, initialCount: 2000, dimX: 20000, dimY: 20000, dimZ: 20000, 
             spreadX: 1.0, spreadY: 1.0, spreadZ: 1.0, 
             order: 0.5, centerDensity: 0, densityRadius: 0.25, densityMultiplier: 2.0,
             baseSize: 2.0, spawnRate: 20, entropy: 0.15, shape: 0.5, distributionType: 'Grid',
