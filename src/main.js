@@ -103,17 +103,38 @@ class VepaEngine {
                 }))
             });
             let chaosPointerId = 0;
+            let chaosHoldTimer = null;
             const onPointerDown = (e) => {
                 chaosPointerId = (e.pointerId || 0);
                 try { window.parent.postMessage({ type: 'chaos:pointer-down', data: { pointerId: chaosPointerId } }, '*'); } catch(ex) {}
+                // Start hold timer (400ms → fullscreen)
+                chaosHoldTimer = setTimeout(() => {
+                    chaosHoldTimer = null;
+                    try { window.parent.postMessage({ type: 'chaos:hold-start', data: null }, '*'); } catch(ex) {}
+                }, 400);
             };
             const onPointerUp = (e) => {
                 if (chaosPointerId === (e.pointerId || 0)) {
+                    if (chaosHoldTimer) {
+                        clearTimeout(chaosHoldTimer);
+                        chaosHoldTimer = null;
+                    } else {
+                        try { window.parent.postMessage({ type: 'chaos:hold-end', data: _buildState() }, '*'); } catch(ex) {}
+                    }
                     try { window.parent.postMessage({ type: 'chaos:pointer-up', data: _buildState() }, '*'); } catch(ex) {}
                 }
             };
+            const onPointerCancel = () => {
+                if (chaosHoldTimer) {
+                    clearTimeout(chaosHoldTimer);
+                    chaosHoldTimer = null;
+                }
+                try { window.parent.postMessage({ type: 'chaos:hold-end', data: null }, '*'); } catch(ex) {}
+            };
             this.canvas.addEventListener('pointerdown', onPointerDown);
             this.canvas.addEventListener('pointerup', onPointerUp);
+            this.canvas.addEventListener('pointercancel', onPointerCancel);
+            this.canvas.addEventListener('pointerleave', onPointerCancel);
 
             // Listen for commands from parent
             window.addEventListener('message', (e) => {

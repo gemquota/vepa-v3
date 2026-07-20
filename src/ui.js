@@ -2139,6 +2139,24 @@ window.randomizeAllWorlds = () => {
     if (label) label.textContent = 'all worlds randomized  [tap to select]';
 };
 
+// ─── Multiplex: toggle drawer minimize ───
+window.toggleMultiplexDrawer = () => {
+    const drawer = document.getElementById('multiplex-toolbar');
+    if (!drawer) return;
+    const isMinimized = drawer.classList.toggle('multiplex-minimized');
+    const btn = document.getElementById('multiplex-minimize-btn');
+    if (btn) btn.textContent = isMinimized ? '▶' : '◀';
+    const items = drawer.querySelectorAll('.close-overlay-btn, #multiplex-selection-label');
+    items.forEach(el => el.style.display = isMinimized ? 'none' : '');
+    if (isMinimized) {
+        drawer.style.width = '38px';
+        drawer.style.minWidth = '38px';
+    } else {
+        drawer.style.width = '120px';
+        drawer.style.minWidth = '120px';
+    }
+};
+
 // ─── Chaos Derivation Drawer ───
 let _derivationSelectedState = null;
 let _derivationSelectedIndex = -1;
@@ -2185,6 +2203,8 @@ document.addEventListener('input', (e) => {
         document.getElementById('derivation-law-val').textContent = e.target.value + '%';
     } else if (e.target.id === 'derivation-world-slider') {
         document.getElementById('derivation-world-val').textContent = e.target.value + '%';
+    } else if (e.target.id === 'derivation-species-slider') {
+        document.getElementById('derivation-species-val').textContent = e.target.value + '%';
     }
 });
 
@@ -2252,6 +2272,47 @@ window.addEventListener('message', (e) => {
             }
         }
         _chaosPointerTarget = -1;
+    }
+    
+    if (e.data && e.data.type === 'chaos:hold-start') {
+        // Hold: make this cell fullscreen
+        const cell = cells[sourceIndex];
+        if (cell) {
+            cell.style.position = 'fixed';
+            cell.style.top = '0';
+            cell.style.left = '0';
+            cell.style.width = '100vw';
+            cell.style.height = '100vh';
+            cell.style.zIndex = '6000';
+            cell.style.border = '4px solid #4488ff';
+            const label = document.getElementById('multiplex-selection-label');
+            if (label) label.textContent = 'holding world #' + (sourceIndex + 1) + '  [release to exit]';
+        }
+    }
+    
+    if (e.data && e.data.type === 'chaos:hold-end') {
+        // Release: restore cell
+        const cell = cells[sourceIndex];
+        if (cell) {
+            cell.style.position = '';
+            cell.style.top = '';
+            cell.style.left = '';
+            cell.style.width = '';
+            cell.style.height = '';
+            cell.style.zIndex = '';
+            cell.style.border = '2px solid transparent';
+            // Re-apply highlight if this was selected
+            if (_derivationSelectedIndex === sourceIndex) {
+                cell.style.borderColor = '#4488ff';
+            }
+            // Store state from hold-end if provided
+            if (e.data.data) {
+                _derivationSelectedState = e.data.data;
+                _derivationSelectedIndex = sourceIndex;
+            }
+            const label = document.getElementById('multiplex-selection-label');
+            if (label) label.textContent = 'world #' + (sourceIndex + 1) + ' selected';
+        }
     }
     
     if (e.data && e.data.type === 'chaos:state-snapshot') {

@@ -414,9 +414,9 @@
 
     <div id="chaos-grid-overlay" class="fullscreen-overlay hidden" style="z-index: 50; background: #000; pointer-events: none !important; display:flex; flex-direction:row;">
         <!-- Multiplex Drawer — left sidebar -->
-        <div id="multiplex-toolbar" class="menu-chunk chunk-type-side" style="flex-shrink:0; pointer-events:auto; display:flex; flex-direction:column; align-items:stretch; gap:3px; padding:8px 6px; background:#0a0a18; border-right:1px solid #2a2a44; border-radius:0; width:120px; min-width:120px; overflow-y:auto;">
+        <div id="multiplex-toolbar" class="menu-chunk chunk-type-side" style="flex-shrink:0; pointer-events:auto; display:flex; flex-direction:column; align-items:stretch; gap:3px; padding:8px 6px; background:#0a0a18; border-right:1px solid #2a2a44; border-radius:0; width:120px; min-width:38px; overflow-y:auto; transition:width 0.2s;">
             <div class="bolt t-l"></div><div class="bolt t-r"></div><div class="bolt b-l"></div><div class="bolt b-r"></div>
-            <span style="color:#6688cc; font-size:10px; font-weight:bold; letter-spacing:2px; text-align:center; margin-bottom:6px;">MULTIPLEX</span>
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; padding:0 2px;"><span style="color:#6688cc; font-size:10px; font-weight:bold; letter-spacing:2px;">MULTIPLEX</span><button id="multiplex-minimize-btn" onclick="window.toggleMultiplexDrawer()" style="background:none; border:none; color:#556677; cursor:pointer; font-size:12px; padding:0 2px; line-height:1;" title="Minimize drawer">◀</button></div>
             <span style="height:1px; background:#2a2a44; margin:0 4px 4px 4px;"></span>
             <button class="close-overlay-btn" onclick="window.rerollChaosGrid()" style="font-size:10px; padding:4px 6px; width:100%;">⟳ REROLL</button>
             <button class="close-overlay-btn" onclick="window.randomizeAllWorlds()" style="font-size:10px; padding:4px 6px; width:100%;">☄ RANDOMIZE</button>
@@ -427,17 +427,7 @@
         </div>
         <div id="chaos-grid-container" style="flex:1; display: grid; width: 100%; gap: 2px; padding: 6px; box-sizing: border-box; pointer-events: none;"></div>
 
-        <!-- Chaos Derivation Drawer (DV) -->
-        <div id="chaos-derivation-drawer" class="preset-dialog hidden" style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:7000; pointer-events:auto; width:420px; max-height:80vh; overflow-y:auto;">
-            <div class="preset-dialog-inner">
-                <div class="preset-dialog-header">
-                    <span>DERIVATION_ENGINE</span>
-                    <span class="p-info-close" onclick="window.closeChaosDerivationDrawer()" style="cursor:pointer; color:#666;">[X]</span>
-                </div>
-                <div class="settings-group-header">SOURCE_WORLD</div>
-                <div id="derivation-source-display" style="color:#8899aa;font-size:11px;margin-bottom:12px;padding:6px 10px;background:#0d0d1a;border-radius:4px;border:1px solid #1a1a33;">
-                    No world selected. Long-press a world in the grid to select it.
-                </div>
+        
 
                 <div class="settings-group-header">VARIANCE</div>
                 <div class="settings-group" style="margin-bottom:16px;">
@@ -473,6 +463,25 @@
                     </label>
                 </div>
 
+                <div class="settings-group-header">SPECIES & PARTICLES</div>
+                <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+                    <label style="color:#aabbcc;font-size:10px;display:flex;align-items:center;gap:4px;cursor:pointer;">
+                        <input type="checkbox" id="derive-species-count" checked> Species Count
+                    </label>
+                    <label style="color:#aabbcc;font-size:10px;display:flex;align-items:center;gap:4px;cursor:pointer;">
+                        <input type="checkbox" id="derive-particle-count" checked> Particle Count
+                    </label>
+                    <label style="color:#aabbcc;font-size:10px;display:flex;align-items:center;gap:4px;cursor:pointer;">
+                        <input type="checkbox" id="derive-colors" checked> Colors
+                    </label>
+                </div>
+
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                    <label style="color:#88aacc;font-size:10px;">SPECIES VARIANCE</label>
+                    <span id="derivation-species-val" style="color:#aaccff;font-size:10px;">30%</span>
+                </div>
+                <input type="range" id="derivation-species-slider" min="0" max="100" value="30" style="width:100%;accent-color:#aa66ff;">
+
                 <div class="settings-group-header">METHOD</div>
                 <div style="display:flex;gap:8px;margin-bottom:16px;">
                     <button class="derive-method-btn btn-sci-fi secondary active" data-method="additive" style="flex:1;font-size:9px;padding:6px;">ADDITIVE</button>
@@ -487,6 +496,18 @@
             </div>
         </div>
     </div>
+
+    <!-- Chaos Derivation Drawer (DV) -->
+        <div id="chaos-derivation-drawer" class="preset-dialog hidden" style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:7000; pointer-events:auto; width:420px; max-height:80vh; overflow-y:auto;">
+            <div class="preset-dialog-inner">
+                <div class="preset-dialog-header">
+                    <span>DERIVATION_ENGINE</span>
+                    <span class="p-info-close" onclick="window.closeChaosDerivationDrawer()" style="cursor:pointer; color:#666;">[X]</span>
+                </div>
+                <div class="settings-group-header">SOURCE_WORLD</div>
+                <div id="derivation-source-display" style="color:#8899aa;font-size:11px;margin-bottom:12px;padding:6px 10px;background:#0d0d1a;border-radius:4px;border:1px solid #1a1a33;">
+                    No world selected. Long-press a world in the grid to select it.
+                </div>
 
     <script type="module" src="./src/main.js"></script></body>
 </html>
