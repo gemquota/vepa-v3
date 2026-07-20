@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>VEPA v3: Particle God</title>
-  <script type="module" crossorigin src="/vepa-v3/assets/index-CNBNv1P9.js"></script>
+  <script type="module" crossorigin src="/vepa-v3/assets/index-D3vdHvrU.js"></script>
   <link rel="modulepreload" crossorigin href="/vepa-v3/assets/Geometry-BzNjHJap.js">
   <link rel="modulepreload" crossorigin href="/vepa-v3/assets/canvasUtils-D8_yAUUz.js">
   <link rel="modulepreload" crossorigin href="/vepa-v3/assets/init-DeMrEKzM.js">
@@ -421,9 +421,9 @@
         <iframe id="codex-iframe" src="about:blank" style="width:100%; height:100%; border:none;"></iframe>
     </div>
 
-    <div id="chaos-grid-overlay" class="fullscreen-overlay hidden" style="z-index: 50; background: #000; pointer-events: none !important;">
-        <!-- Multiplex Toolbar -->
-        <div id="multiplex-toolbar" class="menu-chunk chunk-type-3" style="position:absolute; top:6px; left:50%; transform:translateX(-50%); z-index:6001; pointer-events:auto; display:flex; align-items:center; gap:8px; padding:4px 14px; background:#0a0a14; border:1px solid #2a2a44;">
+    <div id="chaos-grid-overlay" class="fullscreen-overlay hidden" style="z-index: 50; background: #000; pointer-events: none !important; display:flex; flex-direction:column;">
+        <!-- Multiplex Toolbar — attached to top of grid -->
+        <div id="multiplex-toolbar" class="menu-chunk chunk-type-3" style="flex-shrink:0; pointer-events:auto; display:flex; align-items:center; gap:8px; padding:5px 14px; background:#0a0a18; border-bottom:1px solid #2a2a44; border-radius:0; min-height:34px;">
             <div class="bolt t-l"></div><div class="bolt t-r"></div><div class="bolt b-l"></div><div class="bolt b-r"></div>
             <span style="color:#6688cc; font-size:10px; font-weight:bold; letter-spacing:2px; margin-right:6px;">MULTIPLEX</span>
             <div style="width:1px; height:20px; background:#2a2a44;"></div>
@@ -433,9 +433,9 @@
             <button class="sq-btn" onclick="window.openChaosDerivationDrawer()" title="Derive variants from selected world" style="font-size:11px; padding:2px 8px; color:#aa88ff;">🧬</button>
             <div style="width:1px; height:20px; background:#2a2a44;"></div>
             <button class="sq-btn" onclick="window.closeChaosGrid()" title="Close multiplex" style="font-size:11px; padding:2px 8px; color:#ff6666;">✕</button>
-            <span id="multiplex-selection-label" style="color:#667788; font-size:9px; margin-left:4px;">tap world to select</span>
+            <span id="multiplex-selection-label" style="color:#667788; font-size:9px; margin-left:4px; flex:1; text-align:right;">tap world to select</span>
         </div>
-        <div id="chaos-grid-container" style="display: grid; width: 100%; height: 100%; gap: 2px; padding: 44px 6px 6px 6px; box-sizing: border-box; pointer-events: none;"></div>
+        <div id="chaos-grid-container" style="flex:1; display: grid; width: 100%; gap: 2px; padding: 6px; box-sizing: border-box; pointer-events: none;"></div>
 
         <!-- Chaos Derivation Drawer (DV) -->
         <div id="chaos-derivation-drawer" class="preset-dialog hidden" style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:7000; pointer-events:auto; width:420px; max-height:80vh; overflow-y:auto;">
