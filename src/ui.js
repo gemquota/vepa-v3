@@ -368,6 +368,16 @@ export function setupUI(engine) {
     window.closeChaosGrid = () => {
         const overlay = document.getElementById('chaos-grid-overlay');
         const container = document.getElementById('chaos-grid-container');
+        
+        // Apply selected world's state to parent engine
+        if (_derivationSelectedState && window.engine && window.engine.receiveDerivedState) {
+            try {
+                window.engine.receiveDerivedState(_derivationSelectedState);
+            } catch(e) {
+                console.warn('Failed to apply selected world state:', e);
+            }
+        }
+        
         overlay.classList.add('hidden');
         container.innerHTML = ''; // Kill iframes
     };
