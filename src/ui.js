@@ -2087,6 +2087,162 @@ window.quickLoadPreset = (name) => {
     }
 };
 
+// ─── Chaos Derivation Drawer ───
+let _derivationSelectedState = null;
+let _derivationSelectedIndex = -1;
+
+window.openChaosDerivationDrawer = () => {
+    const drawer = document.getElementById('chaos-derivation-drawer');
+    if (!drawer) return;
+    if (!_derivationSelectedState) {
+        alert('Long-press a world in the grid first to select it as the source.');
+        return;
+    }
+    drawer.classList.remove('hidden');
+};
+
+window.closeChaosDerivationDrawer = () => {
+    const drawer = document.getElementById('chaos-derivation-drawer');
+    if (drawer) drawer.classList.add('hidden');
+};
+
+// Slider live updates
+document.addEventListener('input', (e) => {
+    if (e.target.id === 'derivation-dna-slider') {
+        document.getElementById('derivation-dna-val').textContent = e.target.value + '%';
+    } else if (e.target.id === 'derivation-law-slider') {
+        document.getElementById('derivation-law-val').textContent = e.target.value + '%';
+    } else if (e.target.id === 'derivation-world-slider') {
+        document.getElementById('derivation-world-val').textContent = e.target.value + '%';
+    }
+});
+
+// Method button toggling
+document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.derive-method-btn');
+    if (btn) {
+        document.querySelectorAll('.derive-method-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+    }
+});
+
+// Parent-side listener: receive chaos:select from child iframes
+window.addEventListener('message', (e) => {
+    if (e.data && e.data.type === 'chaos:select') {
+        _derivationSelectedState = e.data.data;
+        // Try to determine which iframe index sent it
+        const container = document.getElementById('chaos-grid-container');
+        if (container) {
+            const iframes = container.querySelectorAll('iframe');
+            for (let i = 0; i < iframes.length; i++) {
+                if (iframes[i].contentWindow === e.source) {
+                    _derivationSelectedIndex = i;
+                    break;
+                }
+            }
+        }
+        // Update source display
+        const display = document.getElementById('derivation-source-display');
+        if (display) {
+            const nLaws = _derivationSelectedState.laws ? 
+                Object.values(_derivationSelectedState.laws).reduce((sum, cat) => 
+                    sum + Object.values(cat).filter(v => v === true).length, 0) : 0;
+            display.textContent = `World #${_derivationSelectedIndex + 1} selected (${_derivationSelectedState.species?.length || 0} species, ${nLaws} active laws)`;
+            display.style.borderColor = '#4488ff';
+        }
+    }
+});
+
+window.applyChaosDerivation = () => {
+    if (!_derivationSelectedState) {
+        alert('No source world selected. Long-press a world first.');
+        return;
+    }
+
+    const dnaVar = parseInt(document.getElementById('derivation-dna-slider').value) / 100;
+    const lawVar = parseInt(document.getElementById('derivation-law-slider').value) / 100;
+    const worldVar = parseInt(document.getElementById('derivation-world-slider').value) / 100;
+    const deriveDNA = document.getElementById('derive-dna').checked;
+    const deriveLaws = document.getElementById('derive-laws').checked;
+    const deriveWorld = document.getElementById('derive-world').checked;
+    const method = document.querySelector('.derive-method-btn.active')?.dataset.method || 'additive';
+
+    const container = document.getElementById('chaos-grid-container');
+    if (!container) return;
+    const iframes = container.querySelectorAll('iframe');
+
+    iframes.forEach((iframe, idx) => {
+        if (idx === _derivationSelectedIndex) return; // Keep source unchanged
+        if (!iframe.contentWindow) return;
+
+        // Deep clone the selected state
+        const derived = JSON.parse(JSON.stringify(_derivationSelectedState));
+
+        // Apply variance
+        if (deriveDNA && derived.species) {
+            derived.species.forEach((s) => {
+                if (!s.dna) return;
+                s.dna = s.dna.map((v, i) => {
+                    const range = window?.engine?.constructor?.DNA_RANGES ? 
+                        window.engine.constructor.DNA_RANGES[i] : { min: 0, max: 1 };
+                    const rMin = range?.min ?? 0;
+                    const rMax = range?.max ?? 1;
+                    const spread = (rMax - rMin) * dnaVar;
+                    let noise;
+                    if (method === 'additive') {
+                        noise = (Math.random() - 0.5) * 2 * spread;
+                    } else if (method === 'multiplicative') {
+                        noise = v * (Math.random() - 0.5) * 2 * dnaVar;
+                    } else { // gaussian
+                        const u1 = Math.random(), u2 = Math.random();
+                        noise = Math.sqrt(-2 * Math.log(u1 + 0.0001)) * Math.cos(2 * Math.PI * u2) * spread * 0.5;
+                    }
+                    return Math.max(rMin, Math.min(rMax, v + noise));
+                });
+            });
+        }
+
+        if (deriveLaws && derived.laws) {
+            Object.keys(derived.laws).forEach(cat => {
+                const group = derived.laws[cat];
+                if (!group) return;
+                Object.keys(group).forEach(k => {
+                    if (typeof group[k] === 'boolean') {
+                        // Flip with probability proportional to lawVar
+                        if (Math.random() < lawVar * 0.5) {
+                            group[k] = !group[k];
+                        }
+                    } else if (typeof group[k] === 'number') {
+                        const noise = (Math.random() - 0.5) * 2 * lawVar * (group[k] || 0.5);
+                        group[k] = Math.max(0, Math.min(2, group[k] + noise));
+                    }
+                });
+            });
+        }
+
+        if (deriveWorld && derived.worldConfig) {
+            Object.keys(derived.worldConfig).forEach(k => {
+                const v = derived.worldConfig[k];
+                if (typeof v === 'number' && k !== 'count') {
+                    const noise = (Math.random() - 0.5) * 2 * worldVar * (Math.abs(v) || 1);
+                    derived.worldConfig[k] = v + noise;
+                }
+            });
+        }
+
+        // Send derived state to this iframe
+        try {
+            iframe.contentWindow.postMessage({ type: 'chaos:derive', data: derived }, '*');
+        } catch(e) {
+            console.warn('Failed to send derived state to iframe', idx, e);
+        }
+    });
+
+    window.closeChaosDerivationDrawer();
+};
+
+// ─── End Chaos Derivation Drawer ───
+
 // Auto-render quick presets on update
 window.addEventListener('ui:presetsUpdated', () => {
     renderQuickPresets(window.engine);

@@ -1135,3 +1135,56 @@ input[type=range] { width: 100%; accent-color: var(--red-bright); height: 2px; }
 .slider-row .log-slider-container { width: 100%; }
 .slider-row select,
 .slider-row .sq-toggle { width: 100%; box-sizing: border-box; }
+
+
+/* ─── Chaos Derivation Drawer ─── */
+.derive-method-btn.active {
+    background: linear-gradient(135deg, #4466aa, #8844aa) !important;
+    border-color: #8866cc !important;
+    color: #fff !important;
+    box-shadow: 0 0 12px rgba(100, 80, 200, 0.4);
+}
+.derive-method-btn:hover {
+    border-color: #6677aa;
+}
+#chaos-derivation-drawer input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: #1a1a33;
+    border-radius: 2px;
+    outline: none;
+}
+#chaos-derivation-drawer input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #6688cc;
+    cursor: pointer;
+    border: 2px solid #88aadd;
+}
+#chaos-derivation-drawer input[type="checkbox"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border: 1px solid #445566;
+    border-radius: 3px;
+    background: #0d0d1a;
+    cursor: pointer;
+    position: relative;
+}
+#chaos-derivation-drawer input[type="checkbox"]:checked {
+    background: #4466aa;
+    border-color: #6688cc;
+}
+#chaos-derivation-drawer input[type="checkbox"]:checked::after {
+    content: "✓";
+    position: absolute;
+    top: -1px;
+    left: 2px;
+    font-size: 10px;
+    color: #fff;
+}

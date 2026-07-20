@@ -38,7 +38,7 @@ class VepaEngine {
             count: 2000, initialCount: 500, dimX: 500, dimY: 500, dimZ: 500, 
             spreadX: 1.0, spreadY: 1.0, spreadZ: 1.0, 
             order: 0.5, centerDensity: 0, densityRadius: 0.25, densityMultiplier: 2.0,
-            baseSize: 1.0, spawnRate: 10, entropy: 0.1, shape: 0.5,
+            baseSize: 1.0, spawnRate: 10, entropy: 0.1, shape: 0.5, distributionType: 'Grid',
             groundHeight: 0.9, cameraMode: 'panning', cameraLocked: false,
             globalViscosity: 0.98, wind: 0.0
         };
@@ -93,6 +93,44 @@ class VepaEngine {
             };
             window.addEventListener('resize', resize);
             resize();
+
+            // Long-press detection for chaos grid selection
+            let longPressTimer = null;
+            let isLongPress = false;
+            const startLongPress = (e) => {
+                isLongPress = false;
+                longPressTimer = setTimeout(() => {
+                    isLongPress = true;
+                    longPressTimer = null;
+                    // Send current state to parent
+                    const state = {
+                        type: 'chaos:select',
+                        data: {
+                            laws: JSON.parse(JSON.stringify(this.laws)),
+                            worldConfig: JSON.parse(JSON.stringify(this.worldConfig)),
+                            species: this.species.map(s => ({ 
+                                name: s.name, dna: [...s.dna], rgb: [...s.rgb], color: s.color, id: s.id 
+                            }))
+                        }
+                    };
+                    try { window.parent.postMessage(state, '*'); } catch(e) {}
+                }, 600);
+            };
+            const endLongPress = () => {
+                if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+            };
+            this.canvas.addEventListener('mousedown', startLongPress);
+            this.canvas.addEventListener('touchstart', startLongPress, { passive: true });
+            this.canvas.addEventListener('mouseup', endLongPress);
+            this.canvas.addEventListener('touchend', endLongPress);
+            this.canvas.addEventListener('mouseleave', endLongPress);
+
+            // Listen for derived parameters from parent
+            window.addEventListener('message', (e) => {
+                if (e.data && e.data.type === 'chaos:derive') {
+                    this.receiveDerivedState(e.data.data);
+                }
+            });
 
             this.worker = new Worker(new URL('./worker/physics.worker.js', import.meta.url), { type: 'module' });
             this.worker.onmessage = (e) => this.handleWorkerMessage(e);
@@ -448,7 +486,17 @@ class VepaEngine {
                 pz = (Math.random() - 0.5) * D * 0.1 * sz;
                 const vMag = 2.0;
                 vx = -Math.sin(angle) * vMag; vy = Math.cos(angle) * vMag;
-            } else { // Grid
+            } else if (distType === 'Grid') {
+                const gx = i % side;
+                const gy = Math.floor(i / side) % side;
+                const gz = Math.floor(i / (side * side));
+                const halfX = (side - 1) / 2;
+                const halfY = (side - 1) / 2;
+                const halfZ = (side - 1) / 2;
+                px = (gx - halfX) * (W / Math.max(1, side - 1));
+                py = (gy - halfY) * (H / Math.max(1, side - 1));
+                pz = (gz - halfZ) * (D / Math.max(1, side - 1));
+            } else { // legacy fallback
                 const gx = i % side;
                 const gy = Math.floor(i / side) % side;
                 const gz = Math.floor(i / (side * side));
@@ -1033,6 +1081,30 @@ class VepaEngine {
             });
         }
         syncUI(this.laws);
+    }
+    receiveDerivedState(state) {
+        if (state.laws) {
+            Object.keys(state.laws).forEach(cat => {
+                if (this.laws[cat]) Object.assign(this.laws[cat], state.laws[cat]);
+            });
+        }
+        if (state.worldConfig) Object.assign(this.worldConfig, state.worldConfig);
+        if (state.species) {
+            state.species.forEach((s, idx) => {
+                if (this.species[idx]) {
+                    this.species[idx].name = s.name;
+                    this.species[idx].dna = s.dna.slice();
+                    this.species[idx].rgb = s.rgb.slice();
+                    this.species[idx].color = s.color;
+                    this.syncDNABuffer(idx);
+                }
+            });
+        }
+        // In non-chaos mode, sync UI if functions available
+        if (!this.isChaosMode && typeof syncUI !== 'undefined') {
+            try { syncUI(this.laws); } catch(e) {}
+        }
+        this.restartSim();
     }
     togglePause() { this.paused = !this.paused; updatePlaybackUI(this.playbackMode, this.paused); }
     hardReset() { if(confirm("Hard reset?")) { localStorage.clear(); location.reload(); } }
