@@ -327,13 +327,19 @@ export function setupUI(engine) {
         container.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
 
         for (let i = 0; i < count; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'chaos-cell';
+            cell.style.cssText = 'position:relative; border:2px solid transparent; transition:border-color 0.2s; background:#000; overflow:hidden;';
+            
             const iframe = document.createElement('iframe');
             iframe.src = 'index.html?chaos=1&base=_chaos_base';
             iframe.style.width = '100%';
             iframe.style.height = '100%';
-            iframe.style.border = '1px solid #333';
+            iframe.style.border = 'none';
             iframe.style.background = '#000';
-            container.appendChild(iframe);
+            
+            cell.appendChild(iframe);
+            container.appendChild(cell);
         }
 
         overlay.classList.remove('hidden');
@@ -351,6 +357,11 @@ export function setupUI(engine) {
         if (container) {
             const iframes = container.querySelectorAll('iframe');
             iframes.forEach(f => f.src = f.src);
+            // Clear all highlights
+            const cells = container.querySelectorAll('.chaos-cell');
+            cells.forEach(c => c.style.borderColor = 'transparent');
+            const label = document.getElementById('multiplex-selection-label');
+            if (label) label.textContent = 'tap world to select';
         }
     };
 
@@ -2133,30 +2144,112 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// Parent-side listener: receive chaos:select from child iframes
+// Parent-side listener: receive chaos:select and chaos:derive-seed from child iframes
 window.addEventListener('message', (e) => {
-    if (e.data && e.data.type === 'chaos:select') {
-        _derivationSelectedState = e.data.data;
-        // Try to determine which iframe index sent it
-        const container = document.getElementById('chaos-grid-container');
-        if (container) {
-            const iframes = container.querySelectorAll('iframe');
-            for (let i = 0; i < iframes.length; i++) {
-                if (iframes[i].contentWindow === e.source) {
-                    _derivationSelectedIndex = i;
-                    break;
-                }
-            }
+    const container = document.getElementById('chaos-grid-container');
+    if (!container) return;
+    const cells = container.querySelectorAll('.chaos-cell');
+    
+    // Find which iframe sent the message
+    let sourceIndex = -1;
+    for (let i = 0; i < cells.length; i++) {
+        const iframe = cells[i].querySelector('iframe');
+        if (iframe && iframe.contentWindow === e.source) {
+            sourceIndex = i;
+            break;
         }
-        // Update source display
+    }
+    if (sourceIndex < 0) return;
+
+    if (e.data && e.data.type === 'chaos:select') {
+        // Tap: select this world with highlight
+        _derivationSelectedIndex = sourceIndex;
+        
+        // Clear all highlights, highlight this one
+        cells.forEach((cell, idx) => {
+            cell.style.borderColor = idx === sourceIndex ? '#4488ff' : 'transparent';
+        });
+        
+        // Update label
+        const label = document.getElementById('multiplex-selection-label');
+        if (label) label.textContent = `world #${sourceIndex + 1} selected  [long-press to derive others]`;
+    }
+    
+    if (e.data && e.data.type === 'chaos:derive-seed') {
+        // Long-press: derive all OTHER worlds from this one
+        const seedState = e.data.data;
+        _derivationSelectedState = seedState;
+        _derivationSelectedIndex = sourceIndex;
+        
+        // Highlight source
+        cells.forEach((cell, idx) => {
+            cell.style.borderColor = idx === sourceIndex ? '#aa88ff' : 'transparent';
+        });
+        
+        // Update source display in DV drawer
         const display = document.getElementById('derivation-source-display');
         if (display) {
-            const nLaws = _derivationSelectedState.laws ? 
-                Object.values(_derivationSelectedState.laws).reduce((sum, cat) => 
+            const activeLaws = seedState.laws ? 
+                Object.values(seedState.laws).reduce((sum, cat) => 
                     sum + Object.values(cat).filter(v => v === true).length, 0) : 0;
-            display.textContent = `World #${_derivationSelectedIndex + 1} selected (${_derivationSelectedState.species?.length || 0} species, ${nLaws} active laws)`;
-            display.style.borderColor = '#4488ff';
+            display.textContent = `World #${sourceIndex + 1} selected (${seedState.species?.length || 0} species, ${activeLaws} active laws)`;
+            display.style.borderColor = '#aa88ff';
         }
+        
+        // Derive all OTHER cells
+        const label = document.getElementById('multiplex-selection-label');
+        const deriveDNA = true, deriveLaws = true, deriveWorld = true;
+        const method = 'additive';
+        const dnaVar = 0.3, lawVar = 0.2, worldVar = 0.2;
+        
+        cells.forEach((cell, idx) => {
+            if (idx === sourceIndex) return; // Keep source as-is
+            const iframe = cell.querySelector('iframe');
+            if (!iframe || !iframe.contentWindow) return;
+            
+            // Deep clone seed state and apply variance
+            const derived = JSON.parse(JSON.stringify(seedState));
+            
+            if (deriveDNA && derived.species) {
+                derived.species.forEach(s => {
+                    if (!s.dna) return;
+                    s.dna = s.dna.map((v, i) => {
+                        const range = { min: 0, max: 1 };
+                        const spread = (range.max - range.min) * dnaVar;
+                        let noise = (Math.random() - 0.5) * 2 * spread;
+                        return Math.max(range.min, Math.min(range.max, (v || 0) + noise));
+                    });
+                });
+            }
+            if (deriveLaws && derived.laws) {
+                Object.keys(derived.laws).forEach(cat => {
+                    const group = derived.laws[cat];
+                    if (!group) return;
+                    Object.keys(group).forEach(k => {
+                        if (typeof group[k] === 'boolean' && Math.random() < lawVar * 0.5) {
+                            group[k] = !group[k];
+                        } else if (typeof group[k] === 'number') {
+                            const noise = (Math.random() - 0.5) * 2 * lawVar * (group[k] || 0.5);
+                            group[k] = Math.max(0, Math.min(2, group[k] + noise));
+                        }
+                    });
+                });
+            }
+            if (deriveWorld && derived.worldConfig) {
+                Object.keys(derived.worldConfig).forEach(k => {
+                    if (typeof derived.worldConfig[k] === 'number' && k !== 'count') {
+                        const noise = (Math.random() - 0.5) * 2 * worldVar * (Math.abs(derived.worldConfig[k]) || 1);
+                        derived.worldConfig[k] += noise;
+                    }
+                });
+            }
+            
+            try {
+                iframe.contentWindow.postMessage({ type: 'chaos:derive', data: derived }, '*');
+            } catch(err) {}
+        });
+        
+        if (label) label.textContent = `world #${sourceIndex + 1} derived to ${cells.length - 1} others  [tap to select another]`;
     }
 });
 

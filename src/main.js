@@ -94,36 +94,42 @@ class VepaEngine {
             window.addEventListener('resize', resize);
             resize();
 
-            // Long-press detection for chaos grid selection
-            let longPressTimer = null;
-            let isLongPress = false;
-            const startLongPress = (e) => {
-                isLongPress = false;
-                longPressTimer = setTimeout(() => {
-                    isLongPress = true;
-                    longPressTimer = null;
-                    // Send current state to parent
-                    const state = {
-                        type: 'chaos:select',
-                        data: {
-                            laws: JSON.parse(JSON.stringify(this.laws)),
-                            worldConfig: JSON.parse(JSON.stringify(this.worldConfig)),
-                            species: this.species.map(s => ({ 
-                                name: s.name, dna: [...s.dna], rgb: [...s.rgb], color: s.color, id: s.id 
-                            }))
-                        }
-                    };
-                    try { window.parent.postMessage(state, '*'); } catch(e) {}
-                }, 600);
+            // Tap-to-select + Long-press-to-derive for chaos grid
+            let chaosPressTimer = null;
+            let isChaosLongPress = false;
+            const _buildState = () => ({
+                laws: JSON.parse(JSON.stringify(this.laws)),
+                worldConfig: JSON.parse(JSON.stringify(this.worldConfig)),
+                species: this.species.map(s => ({ 
+                    name: s.name, dna: [...s.dna], rgb: [...s.rgb], color: s.color, id: s.id 
+                }))
+            });
+            const startChaosPress = () => {
+                isChaosLongPress = false;
+                chaosPressTimer = setTimeout(() => {
+                    isChaosLongPress = true;
+                    chaosPressTimer = null;
+                    // Long press: derive all others from this world
+                    try { window.parent.postMessage({ type: 'chaos:derive-seed', data: _buildState() }, '*'); } catch(e) {}
+                }, 500);
             };
-            const endLongPress = () => {
-                if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+            const endChaosPress = () => {
+                if (chaosPressTimer) {
+                    clearTimeout(chaosPressTimer);
+                    chaosPressTimer = null;
+                    if (!isChaosLongPress) {
+                        // Short tap: select this world for highlighting
+                        try { window.parent.postMessage({ type: 'chaos:select', data: null }, '*'); } catch(e) {}
+                    }
+                }
             };
-            this.canvas.addEventListener('mousedown', startLongPress);
-            this.canvas.addEventListener('touchstart', startLongPress, { passive: true });
-            this.canvas.addEventListener('mouseup', endLongPress);
-            this.canvas.addEventListener('touchend', endLongPress);
-            this.canvas.addEventListener('mouseleave', endLongPress);
+            this.canvas.addEventListener('mousedown', startChaosPress);
+            this.canvas.addEventListener('touchstart', startChaosPress, { passive: true });
+            this.canvas.addEventListener('mouseup', endChaosPress);
+            this.canvas.addEventListener('touchend', endChaosPress);
+            this.canvas.addEventListener('mouseleave', () => {
+                if (chaosPressTimer) { clearTimeout(chaosPressTimer); chaosPressTimer = null; }
+            });
 
             // Listen for derived parameters from parent
             window.addEventListener('message', (e) => {
