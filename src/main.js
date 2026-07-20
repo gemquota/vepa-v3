@@ -94,9 +94,7 @@ class VepaEngine {
             window.addEventListener('resize', resize);
             resize();
 
-            // Tap-to-select + Long-press-to-derive for chaos grid
-            let chaosPressTimer = null;
-            let isChaosLongPress = false;
+            // Relay all pointer interactions to parent for tap/long-press detection
             const _buildState = () => ({
                 laws: JSON.parse(JSON.stringify(this.laws)),
                 worldConfig: JSON.parse(JSON.stringify(this.worldConfig)),
@@ -104,32 +102,18 @@ class VepaEngine {
                     name: s.name, dna: [...s.dna], rgb: [...s.rgb], color: s.color, id: s.id 
                 }))
             });
-            const startChaosPress = () => {
-                isChaosLongPress = false;
-                chaosPressTimer = setTimeout(() => {
-                    isChaosLongPress = true;
-                    chaosPressTimer = null;
-                    // Long press: derive all others from this world
-                    try { window.parent.postMessage({ type: 'chaos:derive-seed', data: _buildState() }, '*'); } catch(e) {}
-                }, 500);
+            let chaosPointerId = 0;
+            const onPointerDown = (e) => {
+                chaosPointerId = (e.pointerId || 0);
+                try { window.parent.postMessage({ type: 'chaos:pointer-down', data: { pointerId: chaosPointerId } }, '*'); } catch(ex) {}
             };
-            const endChaosPress = () => {
-                if (chaosPressTimer) {
-                    clearTimeout(chaosPressTimer);
-                    chaosPressTimer = null;
-                    if (!isChaosLongPress) {
-                        // Short tap: select this world for highlighting
-                        try { window.parent.postMessage({ type: 'chaos:select', data: null }, '*'); } catch(e) {}
-                    }
+            const onPointerUp = (e) => {
+                if (chaosPointerId === (e.pointerId || 0)) {
+                    try { window.parent.postMessage({ type: 'chaos:pointer-up', data: _buildState() }, '*'); } catch(ex) {}
                 }
             };
-            this.canvas.addEventListener('mousedown', startChaosPress);
-            this.canvas.addEventListener('touchstart', startChaosPress, { passive: true });
-            this.canvas.addEventListener('mouseup', endChaosPress);
-            this.canvas.addEventListener('touchend', endChaosPress);
-            this.canvas.addEventListener('mouseleave', () => {
-                if (chaosPressTimer) { clearTimeout(chaosPressTimer); chaosPressTimer = null; }
-            });
+            this.canvas.addEventListener('pointerdown', onPointerDown);
+            this.canvas.addEventListener('pointerup', onPointerUp);
 
             // Listen for derived parameters from parent
             window.addEventListener('message', (e) => {

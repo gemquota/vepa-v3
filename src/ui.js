@@ -342,6 +342,20 @@ export function setupUI(engine) {
             container.appendChild(cell);
         }
 
+
+        // Auto-select center world
+        setTimeout(() => {
+            const cells = container.querySelectorAll('.chaos-cell');
+            if (cells.length > 0) {
+                const center = Math.floor(cells.length / 2);
+                cells.forEach((c, i) => {
+                    c.style.borderColor = i === center ? '#4488ff' : 'transparent';
+                });
+                _derivationSelectedIndex = center;
+                const label = document.getElementById('multiplex-selection-label');
+                if (label) label.textContent = `world #${center + 1} selected  [long-press to derive others]`;
+            }
+        }, 100);
         overlay.classList.remove('hidden');
     };
 
@@ -2105,6 +2119,20 @@ window.quickLoadPreset = (name) => {
     }
 };
 
+// ─── Multiplex: randomize all worlds ───
+window.randomizeAllWorlds = () => {
+    const container = document.getElementById('chaos-grid-container');
+    if (!container) return;
+    const iframes = container.querySelectorAll('iframe');
+    iframes.forEach(f => {
+        try {
+            f.contentWindow.dispatchEvent(new CustomEvent('cmd:chaos', { detail: { total: true } }));
+        } catch(e) {}
+    });
+    const label = document.getElementById('multiplex-selection-label');
+    if (label) label.textContent = 'all worlds randomized  [tap to select]';
+};
+
 // ─── Chaos Derivation Drawer ───
 let _derivationSelectedState = null;
 let _derivationSelectedIndex = -1;
@@ -2144,7 +2172,10 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// Parent-side listener: receive chaos:select and chaos:derive-seed from child iframes
+// Parent-side listener: pointer-down/up relay from iframes + timing-based selection
+let _chaosPointerDownTime = 0;
+let _chaosPointerTarget = -1;
+
 window.addEventListener('message', (e) => {
     const container = document.getElementById('chaos-grid-container');
     if (!container) return;
@@ -2161,97 +2192,114 @@ window.addEventListener('message', (e) => {
     }
     if (sourceIndex < 0) return;
 
-    if (e.data && e.data.type === 'chaos:select') {
-        // Tap: select this world with highlight
-        _derivationSelectedIndex = sourceIndex;
+    if (e.data && e.data.type === 'chaos:pointer-down') {
+        // Record the start of a pointer interaction
+        _chaosPointerDownTime = Date.now();
+        _chaosPointerTarget = sourceIndex;
+    }
+    
+    if (e.data && e.data.type === 'chaos:pointer-up') {
+        // Only process if this matches the last pointer-down
+        if (sourceIndex !== _chaosPointerTarget) return;
         
-        // Clear all highlights, highlight this one
-        cells.forEach((cell, idx) => {
-            cell.style.borderColor = idx === sourceIndex ? '#4488ff' : 'transparent';
-        });
+        const elapsed = Date.now() - _chaosPointerDownTime;
         
-        // Update label
-        const label = document.getElementById('multiplex-selection-label');
-        if (label) label.textContent = `world #${sourceIndex + 1} selected  [long-press to derive others]`;
+        if (elapsed < 500) {
+            // Short tap → select
+            _derivationSelectedIndex = sourceIndex;
+            _derivationSelectedState = null; // Will be set if derive-seed comes later
+            
+            cells.forEach((cell, idx) => {
+                cell.style.borderColor = idx === sourceIndex ? '#4488ff' : 'transparent';
+            });
+            
+            const label = document.getElementById('multiplex-selection-label');
+            if (label) label.textContent = `world #${sourceIndex + 1} selected  [long-press to derive others]`;
+        }
+        _chaosPointerTarget = -1;
     }
     
     if (e.data && e.data.type === 'chaos:derive-seed') {
-        // Long-press: derive all OTHER worlds from this one
+        // Long-press (timed in iframe): derive all OTHER worlds from this one
         const seedState = e.data.data;
         _derivationSelectedState = seedState;
         _derivationSelectedIndex = sourceIndex;
         
-        // Highlight source
-        cells.forEach((cell, idx) => {
-            cell.style.borderColor = idx === sourceIndex ? '#aa88ff' : 'transparent';
-        });
-        
-        // Update source display in DV drawer
-        const display = document.getElementById('derivation-source-display');
-        if (display) {
-            const activeLaws = seedState.laws ? 
-                Object.values(seedState.laws).reduce((sum, cat) => 
-                    sum + Object.values(cat).filter(v => v === true).length, 0) : 0;
-            display.textContent = `World #${sourceIndex + 1} selected (${seedState.species?.length || 0} species, ${activeLaws} active laws)`;
-            display.style.borderColor = '#aa88ff';
-        }
-        
-        // Derive all OTHER cells
-        const label = document.getElementById('multiplex-selection-label');
-        const deriveDNA = true, deriveLaws = true, deriveWorld = true;
-        const method = 'additive';
-        const dnaVar = 0.3, lawVar = 0.2, worldVar = 0.2;
-        
-        cells.forEach((cell, idx) => {
-            if (idx === sourceIndex) return; // Keep source as-is
-            const iframe = cell.querySelector('iframe');
-            if (!iframe || !iframe.contentWindow) return;
-            
-            // Deep clone seed state and apply variance
-            const derived = JSON.parse(JSON.stringify(seedState));
-            
-            if (deriveDNA && derived.species) {
-                derived.species.forEach(s => {
-                    if (!s.dna) return;
-                    s.dna = s.dna.map((v, i) => {
-                        const range = { min: 0, max: 1 };
-                        const spread = (range.max - range.min) * dnaVar;
-                        let noise = (Math.random() - 0.5) * 2 * spread;
-                        return Math.max(range.min, Math.min(range.max, (v || 0) + noise));
-                    });
-                });
-            }
-            if (deriveLaws && derived.laws) {
-                Object.keys(derived.laws).forEach(cat => {
-                    const group = derived.laws[cat];
-                    if (!group) return;
-                    Object.keys(group).forEach(k => {
-                        if (typeof group[k] === 'boolean' && Math.random() < lawVar * 0.5) {
-                            group[k] = !group[k];
-                        } else if (typeof group[k] === 'number') {
-                            const noise = (Math.random() - 0.5) * 2 * lawVar * (group[k] || 0.5);
-                            group[k] = Math.max(0, Math.min(2, group[k] + noise));
-                        }
-                    });
-                });
-            }
-            if (deriveWorld && derived.worldConfig) {
-                Object.keys(derived.worldConfig).forEach(k => {
-                    if (typeof derived.worldConfig[k] === 'number' && k !== 'count') {
-                        const noise = (Math.random() - 0.5) * 2 * worldVar * (Math.abs(derived.worldConfig[k]) || 1);
-                        derived.worldConfig[k] += noise;
-                    }
-                });
-            }
-            
-            try {
-                iframe.contentWindow.postMessage({ type: 'chaos:derive', data: derived }, '*');
-            } catch(err) {}
-        });
-        
-        if (label) label.textContent = `world #${sourceIndex + 1} derived to ${cells.length - 1} others  [tap to select another]`;
+        _selectAndDeriveAllOthers(sourceIndex, seedState);
     }
 });
+
+function _selectAndDeriveAllOthers(sourceIndex, seedState) {
+    const container = document.getElementById('chaos-grid-container');
+    if (!container) return;
+    const cells = container.querySelectorAll('.chaos-cell');
+    
+    // Highlight source
+    cells.forEach((cell, idx) => {
+        cell.style.borderColor = idx === sourceIndex ? '#aa88ff' : 'transparent';
+    });
+    
+    // Update source display in DV drawer
+    const display = document.getElementById('derivation-source-display');
+    if (display) {
+        const activeLaws = seedState.laws ? 
+            Object.values(seedState.laws).reduce((sum, cat) => 
+                sum + Object.values(cat).filter(v => v === true).length, 0) : 0;
+        display.textContent = `World #${sourceIndex + 1} selected (${seedState.species?.length || 0} species, ${activeLaws} active laws)`;
+        display.style.borderColor = '#aa88ff';
+    }
+    
+    // Derive all OTHER cells
+    const label = document.getElementById('multiplex-selection-label');
+    const dnaVar = 0.3, lawVar = 0.2, worldVar = 0.2;
+    
+    cells.forEach((cell, idx) => {
+        if (idx === sourceIndex) return;
+        const iframe = cell.querySelector('iframe');
+        if (!iframe || !iframe.contentWindow) return;
+        
+        const derived = JSON.parse(JSON.stringify(seedState));
+        
+        if (derived.species) {
+            derived.species.forEach(s => {
+                if (!s.dna) return;
+                s.dna = s.dna.map((v, i) => {
+                    const spread = 1 * dnaVar;
+                    const noise = (Math.random() - 0.5) * 2 * spread;
+                    return Math.max(0, Math.min(1, (v || 0) + noise));
+                });
+            });
+        }
+        if (derived.laws) {
+            Object.keys(derived.laws).forEach(cat => {
+                const group = derived.laws[cat];
+                if (!group) return;
+                Object.keys(group).forEach(k => {
+                    if (typeof group[k] === 'boolean' && Math.random() < lawVar * 0.5) {
+                        group[k] = !group[k];
+                    } else if (typeof group[k] === 'number') {
+                        const noise = (Math.random() - 0.5) * 2 * lawVar * (group[k] || 0.5);
+                        group[k] = Math.max(0, Math.min(2, group[k] + noise));
+                    }
+                });
+            });
+        }
+        if (derived.worldConfig) {
+            Object.keys(derived.worldConfig).forEach(k => {
+                if (typeof derived.worldConfig[k] === 'number' && k !== 'count') {
+                    const noise = (Math.random() - 0.5) * 2 * worldVar * (Math.abs(derived.worldConfig[k]) || 1);
+                    derived.worldConfig[k] += noise;
+                }
+            });
+        }
+        
+        try {
+            iframe.contentWindow.postMessage({ type: 'chaos:derive', data: derived }, '*');
+        } catch(err) {}
+    });
+    
+    if (label) label.textContent = `world #${sourceIndex + 1} derived to ${cells.length - 1} others  [tap to select]`;
+}
 
 window.applyChaosDerivation = () => {
     if (!_derivationSelectedState) {
