@@ -446,19 +446,39 @@ class VepaEngine {
         const spacingY = (H * sy) / side;
         const spacingZ = (D * sz) / side;
 
+        // Side based on active particles so grid fills evenly
+        const activeCount = Math.max(initCount, Math.min(count, 2000));
+        const gridSide = Math.ceil(Math.pow(activeCount, 1/3));
+        const gSpacingX = W / Math.max(1, gridSide - 1);
+        const gSpacingY = H / Math.max(1, gridSide - 1);
+        const gSpacingZ = D / Math.max(1, gridSide - 1);
+
+        // Step: spread alive particles evenly across all 3 axes
+        const aliveStep = Math.max(1, Math.floor(count / Math.max(1, initCount)));
+        let alivePlaced = 0;
+
         for (let i = 0; i < count; i++) {
-            if (i >= initCount) {
-                this.particles[i * STRIDE + STRIDE_INDEXES.DEAD] = 1;
-                continue;
-            }
             const ptr = i * STRIDE;
             const vPtr = i * 5;
+
+            // Decide alive: step pattern for Grid, first N for others
+            let isAlive;
+            if (distType === 'Grid') {
+                isAlive = (i % aliveStep === 0) && alivePlaced < initCount;
+            } else {
+                isAlive = alivePlaced < initCount;
+            }
+            if (isAlive) alivePlaced++;
+
+            if (!isAlive) {
+                this.particles[ptr + STRIDE_INDEXES.DEAD] = 1;
+            }
             if (!this.isChaosMode && this.texture && this.world) {
                 const sprite = new PIXI.Sprite(this.texture);
                 sprite.anchor.set(0.5); this.world.addChild(sprite); this.particleSprites.push(sprite);
             }
 
-            const spec = this.species[i % this.species.length];
+            const spec = this.species[isAlive ? (alivePlaced - 1 + this.species.length) % this.species.length : i % this.species.length];
 
             let px = 0, py = 0, pz = 0, vx = 0, vy = 0, vz = 0;
 
@@ -466,7 +486,8 @@ class VepaEngine {
                 px = (Math.random() - 0.5) * W * sx;
                 py = (Math.random() - 0.5) * H * sy;
                 pz = (Math.random() - 0.5) * D * sz;
-            } else if (distType === 'Big Bang') {                px = (Math.random() - 0.5) * 10;
+            } else if (distType === 'Big Bang') {
+                px = (Math.random() - 0.5) * 10;
                 py = (Math.random() - 0.5) * 10;
                 pz = (Math.random() - 0.5) * 10;
                 const mag = 5.0 + Math.random() * 10.0;
@@ -474,8 +495,8 @@ class VepaEngine {
                 const d = Math.hypot(dir.x, dir.y, dir.z) || 1;
                 vx = (dir.x/d) * mag; vy = (dir.y/d) * mag; vz = (dir.z/d) * mag;
             } else if (distType === 'Bipolar') {
-                const side = Math.random() > 0.5 ? 1 : -1;
-                px = side * W * 0.4 * sx + (Math.random()-0.5) * 100;
+                const bipolar_side = Math.random() > 0.5 ? 1 : -1;
+                px = bipolar_side * W * 0.4 * sx + (Math.random()-0.5) * 100;
                 py = (Math.random()-0.5) * H * sy;
                 pz = (Math.random()-0.5) * D * sz;
             } else if (distType === 'Galaxy') {
@@ -487,22 +508,19 @@ class VepaEngine {
                 const vMag = 2.0;
                 vx = -Math.sin(angle) * vMag; vy = Math.cos(angle) * vMag;
             } else if (distType === 'Grid') {
-                const gx = i % side;
-                const gy = Math.floor(i / side) % side;
-                const gz = Math.floor(i / (side * side));
-                const halfX = (side - 1) / 2;
-                const halfY = (side - 1) / 2;
-                const halfZ = (side - 1) / 2;
-                px = (gx - halfX) * (W / Math.max(1, side - 1));
-                py = (gy - halfY) * (H / Math.max(1, side - 1));
-                pz = (gz - halfZ) * (D / Math.max(1, side - 1));
+                const gx = i % gridSide;
+                const gy = Math.floor(i / gridSide) % gridSide;
+                const gz = Math.floor(i / (gridSide * gridSide));
+                px = (gx - (gridSide-1)/2) * gSpacingX;
+                py = (gy - (gridSide-1)/2) * gSpacingY;
+                pz = (gz - (gridSide-1)/2) * gSpacingZ;
             } else { // legacy fallback
-                const gx = i % side;
-                const gy = Math.floor(i / side) % side;
-                const gz = Math.floor(i / (side * side));
-                px = (gx - (side-1)/2) * spacingX;
-                py = (gy - (side-1)/2) * spacingY;
-                pz = (gz - (side-1)/2) * spacingZ;
+                const gx = i % gridSide;
+                const gy = Math.floor(i / gridSide) % gridSide;
+                const gz = Math.floor(i / (gridSide * gridSide));
+                px = (gx - (gridSide-1)/2) * gSpacingX;
+                py = (gy - (gridSide-1)/2) * gSpacingY;
+                pz = (gz - (gridSide-1)/2) * gSpacingZ;
             }
 
 
@@ -512,9 +530,12 @@ class VepaEngine {
             const densityRadius = this.worldConfig.densityRadius || 0.25;
             const densityMultiplier = this.worldConfig.densityMultiplier || 2.0;
             if (order < 1.0 && distType !== 'Grid') {
-                const gridPx = (gx - (side-1)/2) * spacingX;
-                const gridPy = (gy - (side-1)/2) * spacingY;
-                const gridPz = (gz - (side-1)/2) * spacingZ;
+                const gxLocal = i % gridSide;
+                const gyLocal = Math.floor(i / gridSide) % gridSide;
+                const gzLocal = Math.floor(i / (gridSide * gridSide));
+                const gridPx = (gxLocal - (gridSide-1)/2) * gSpacingX;
+                const gridPy = (gyLocal - (gridSide-1)/2) * gSpacingY;
+                const gridPz = (gzLocal - (gridSide-1)/2) * gSpacingZ;
                 if (distType === 'Soup') {
                     px = px * (1 - order) + gridPx * order;
                     py = py * (1 - order) + gridPy * order;

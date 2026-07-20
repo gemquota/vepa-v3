@@ -255,9 +255,9 @@ const helpPanel = new HelpPanel(); const tooltip = new Tooltip();
 const emit = (name, detail) => {
     window.dispatchEvent(new CustomEvent(name, { detail }));
     
-    // Broadcast to chaos grid iframes
+    // Broadcast to chaos grid iframes (including chaos commands in multiplex mode)
     const overlay = document.getElementById('chaos-grid-overlay');
-    if (overlay && !overlay.classList.contains('hidden') && name !== 'cmd:chaos') {
+    if (overlay && !overlay.classList.contains('hidden')) {
         const container = document.getElementById('chaos-grid-container');
         if (container) {
             const iframes = container.querySelectorAll('iframe');
@@ -274,6 +274,13 @@ export function setupUI(engine) {
     window.triggerSmartChaos = (options) => emit('cmd:chaos', options);
 
     window.openSelectiveChaos = () => {
+        const overlay = document.getElementById('chaos-grid-overlay');
+        const isMultiplex = overlay && !overlay.classList.contains('hidden');
+        const indicator = document.getElementById('chaos-mode-indicator');
+        if (indicator) {
+            indicator.textContent = isMultiplex ? 'TARGET: ALL MULTIPLEX INSTANCES' : 'TARGET: Current World';
+            indicator.style.color = isMultiplex ? '#ff8844' : '#88aacc';
+        }
         document.getElementById('selective-chaos-dialog').classList.remove('hidden');
     };
     
