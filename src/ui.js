@@ -329,7 +329,7 @@ export function setupUI(engine) {
         for (let i = 0; i < count; i++) {
             const cell = document.createElement('div');
             cell.className = 'chaos-cell';
-            cell.style.cssText = 'position:relative; border:2px solid transparent; transition:border-color 0.2s; background:#000; overflow:hidden;';
+            cell.style.cssText = 'position:relative; border:2px solid transparent; transition:border-color 0.2s; background:#000; overflow:hidden; pointer-events:auto;';
             
             const iframe = document.createElement('iframe');
             iframe.src = 'index.html?chaos=1&base=_chaos_base';
