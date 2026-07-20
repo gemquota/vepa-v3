@@ -19,7 +19,7 @@ for (const key in DNA_INDEXES) {
     DNA_OFFSETS[key] = STRIDE_INDEXES.DNA_CACHE_START + DNA_INDEXES[key];
 }
 
-const GRID_SIZE = 10;
+const GRID_SIZE = 8;
 let spatialGrid = [];
 
 self.onmessage = (e) => {
@@ -169,7 +169,7 @@ self.onmessage = (e) => {
                 let localDt = dt;
                 if (meta.time) {
                     const d2c = Math.sqrt(particles[ptr]**2 + particles[ptr+1]**2 + particles[ptr+2]**2);
-                    localDt *= Math.max(0.1, Math.min(1.0, d2c / 200));
+                    localDt *= Math.max(0.1, Math.min(1.0, d2c / 2000));
                 }
 
                 if (thermo.heat) { ax += (Math.random()-0.5)*0.5; ay += (Math.random()-0.5)*0.5; az += (Math.random()-0.5)*0.5; }
@@ -250,7 +250,7 @@ self.onmessage = (e) => {
                                     const multiplier = sameSpecies ? (1.0 + affinity) : (1.0 - affinity);
                                     
                                     // G * M1 * M2 / r^2
-                                    const forceMag = (G * particles[ptr + STRIDE_INDEXES.MASS] * particles[oPtr + STRIDE_INDEXES.MASS] * (particles[ptr + DNA_OFFSETS.FORCE]||0) * multiplier * phenoMultiplier) / (d2 + 10.0);
+                                    const forceMag = (G * particles[ptr + STRIDE_INDEXES.MASS] * particles[oPtr + STRIDE_INDEXES.MASS] * (particles[ptr + DNA_OFFSETS.FORCE]||0) * multiplier * phenoMultiplier) / (d * 4.0 + 200.0);
                                     ax += (dx/d)*forceMag; ay += (dy/d)*forceMag; az += (dz/d)*forceMag;
                                 }
 
