@@ -2254,12 +2254,10 @@ window.addEventListener('message', (e) => {
     }
     
     if (e.data && e.data.type === 'chaos:pointer-up') {
-        // Only process if this matches the last pointer-down
-        if (sourceIndex !== _chaosPointerTarget) return;
-        
+        // Process based on the message's source index (the iframe it came from)
         const elapsed = Date.now() - _chaosPointerDownTime;
         
-        if (elapsed < 500) {
+        if (_chaosPointerTarget === sourceIndex && elapsed < 500) {
             // Short tap → select + store state for derivation
             _derivationSelectedIndex = sourceIndex;
             _derivationSelectedState = e.data.data; // state snapshot from iframe
@@ -2282,47 +2280,6 @@ window.addEventListener('message', (e) => {
             }
         }
         _chaosPointerTarget = -1;
-    }
-    
-    if (e.data && e.data.type === 'chaos:hold-start') {
-        // Hold: make this cell fullscreen
-        const cell = cells[sourceIndex];
-        if (cell) {
-            cell.style.position = 'fixed';
-            cell.style.top = '0';
-            cell.style.left = '0';
-            cell.style.width = '100vw';
-            cell.style.height = '100vh';
-            cell.style.zIndex = '6000';
-            cell.style.border = '4px solid #4488ff';
-            const label = document.getElementById('multiplex-selection-label');
-            if (label) label.textContent = 'holding world #' + (sourceIndex + 1) + '  [release to exit]';
-        }
-    }
-    
-    if (e.data && e.data.type === 'chaos:hold-end') {
-        // Release: restore cell
-        const cell = cells[sourceIndex];
-        if (cell) {
-            cell.style.position = '';
-            cell.style.top = '';
-            cell.style.left = '';
-            cell.style.width = '';
-            cell.style.height = '';
-            cell.style.zIndex = '';
-            cell.style.border = '2px solid transparent';
-            // Re-apply highlight if this was selected
-            if (_derivationSelectedIndex === sourceIndex) {
-                cell.style.borderColor = '#4488ff';
-            }
-            // Store state from hold-end if provided
-            if (e.data.data) {
-                _derivationSelectedState = e.data.data;
-                _derivationSelectedIndex = sourceIndex;
-            }
-            const label = document.getElementById('multiplex-selection-label');
-            if (label) label.textContent = 'world #' + (sourceIndex + 1) + ' selected';
-        }
     }
     
     if (e.data && e.data.type === 'chaos:state-snapshot') {
