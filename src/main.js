@@ -28,19 +28,19 @@ class VepaEngine {
         this.dnaView = new Uint16Array(this.dnaBuffer);
         this.paused = false;
         this.laws = { 
-            pure: { grav: true, drag: true, jitter: false, coll: true, accr: false, wrap: true, void: false, bond: false, planetary: false, G: 1.0, dt: 1.0 },
-            biol: { life: true, glow: false, affinity: false, reproduction: true, tracking: false, senescence: false, genotype: false, phenotype: false, ener: false, rad: false },
-            chem: { cata: false, solv: false, acid: false, oxid: false, redu: false, poly: false, isom: false, chir: false, crys: false, allo: false },
-            thermo: { heat: false, cold: false, conv: false, radi: false, subl: false, melt: false, boil: false, cond: false, depo: false, exop: false },
-            meta: { time: false, dime: false, chao: false, orde: false, fate: false, will: false, soul: false, mind: false, tele: false, clai: false, preo: false, astr: false }
+            pure: { grav: true, drag: true, jitter: true, coll: true, accr: true, wrap: true, void: true, bond: true, planetary: true, G: 2.0, dt: 1.0 },
+            biol: { life: true, glow: true, affinity: true, reproduction: true, tracking: true, senescence: false, genotype: true, phenotype: true, ener: true, rad: true },
+            chem: { cata: true, solv: true, acid: true, oxid: true, redu: true, poly: true, isom: false, chir: true, crys: true, allo: true },
+            thermo: { heat: true, cold: true, conv: true, radi: true, subl: false, melt: true, boil: true, cond: true, depo: false, exop: true },
+            meta: { time: true, dime: false, chao: true, orde: true, fate: false, will: true, soul: true, mind: true, tele: false, clai: true, preo: true, astr: true }
         };
         this.worldConfig = { 
-            count: 2000, initialCount: 500, dimX: 500, dimY: 500, dimZ: 500, 
+            count: 3000, initialCount: 2000, dimX: 2000, dimY: 2000, dimZ: 2000, 
             spreadX: 1.0, spreadY: 1.0, spreadZ: 1.0, 
             order: 0.5, centerDensity: 0, densityRadius: 0.25, densityMultiplier: 2.0,
-            baseSize: 1.0, spawnRate: 10, entropy: 0.1, shape: 0.5, distributionType: 'Grid',
+            baseSize: 2.0, spawnRate: 20, entropy: 0.15, shape: 0.5, distributionType: 'Grid',
             groundHeight: 0.9, cameraMode: 'panning', cameraLocked: false,
-            globalViscosity: 0.98, wind: 0.0
+            globalViscosity: 0.96, wind: 0.0
         };
         this.zoom = 1.0; this.pan = { x: 0, y: 0, z: 0 }; 
         this.rotation = { x: 0, y: 0 };
@@ -246,35 +246,91 @@ class VepaEngine {
     createDefaultSpecies() {
         const specs = [];
         
-        // Species 1: Sol (Yellow) - High attraction, High fusion, stable
+        // Species 1: Sol (Yellow) - Gravity well, long-range attractor, fusion reactor
         const s1 = this.createSpecies();
         s1.name = "Sol";
-        s1.dna[0] = 0.5;   // Force (attraction)
-        s1.dna[9] = 0.8;   // Fusion
-        s1.dna[10] = 0.05; // Birth Rate
+        s1.dna[0] = 1.5;   // Force (strong attraction)
+        s1.dna[1] = 0.92;  // Viscosity
+        s1.dna[2] = 0.3;   // Torque
+        s1.dna[4] = 0.8;   // Polarity (high charge)
+        s1.dna[5] = 0.9;   // Alpha (dense)
+        s1.dna[9] = 0.9;   // Fusion
+        s1.dna[10] = 0.02; // Birth Rate (slow)
+        s1.dna[13] = 0.8;  // Signal Resp
+        s1.dna[14] = 0.3;  // Pulse Rate
+        s1.dna[18] = 300;  // Neighborhood Radius (huge)
+        s1.dna[19] = 0.9;  // Signal Strength
+        s1.dna[26] = 0.3;  // Inertia
+        s1.dna[28] = 30;   // Max Velocity
+        s1.dna[29] = 2.0;  // Base Radius
+        s1.dna[34] = 0.8;  // Energy Efficiency
+        s1.dna[39] = 0.5;  // Heat Output
+        s1.dna[41] = 0.3;  // Species Affinity (neutral)
         s1.rgb = [1, 1, 0];
         s1.color = "rgb(255, 255, 0)";
         specs.push(s1);
 
-        // Species 2: Aether (Blue) - Fluid, cloud-like, responsive
+        // Species 2: Aether (Cyan) - Communicator, swarm leader, long-range signals
         const s2 = this.createSpecies();
         s2.name = "Aether";
-        s2.dna[1] = 0.99;  // Viscosity (slick)
-        s2.dna[3] = 0.2;   // Jitter
-        s2.dna[13] = 1.5;  // Signal Resp
-        s2.rgb = [0, 0.5, 1];
-        s2.color = "rgb(0, 127, 255)";
+        s2.dna[0] = 0.4;   // Force (mild attraction)
+        s2.dna[1] = 0.97;  // Viscosity (fluid)
+        s2.dna[3] = 0.3;   // Jitter
+        s2.dna[4] = -0.3;  // Polarity (negative)
+        s2.dna[13] = 2.0;  // Signal Resp (high sensitivity)
+        s2.dna[14] = 0.8;  // Pulse Rate
+        s2.dna[18] = 400;  // Neighborhood Radius (extreme range)
+        s2.dna[19] = 1.0;  // Signal Strength (max)
+        s2.dna[20] = 0.3;  // Signal Decay (slow)
+        s2.dna[21] = 0.8;  // Propagation Speed
+        s2.dna[22] = 0.6;  // Tuning CH1
+        s2.dna[23] = 0.4;  // Tuning CH2
+        s2.dna[28] = 50;   // Max Velocity (fast)
+        s2.dna[29] = 1.5;  // Base Radius
+        s2.dna[41] = 0.8;  // Species Affinity (social)
+        s2.rgb = [0, 1, 1];
+        s2.color = "rgb(0, 255, 255)";
         specs.push(s2);
 
-        // Species 3: Void (Red) - Repulsive, chaotic, high turnover
+        // Species 3: Void (Purple) - Repulsive field, chaos agent, high mutation
         const s3 = this.createSpecies();
         s3.name = "Void";
-        s3.dna[0] = -0.5;  // Force (repulsion)
-        s3.dna[12] = 0.2;  // Mutation
-        s3.dna[11] = 0.08; // Death Rate
-        s3.rgb = [1, 0, 0];
-        s3.color = "rgb(255, 0, 0)";
+        s3.dna[0] = -1.2;  // Force (strong repulsion)
+        s3.dna[1] = 0.85;  // Viscosity (slippery)
+        s3.dna[3] = 0.8;   // Jitter (erratic)
+        s3.dna[4] = 0.5;   // Polarity (positive)
+        s3.dna[11] = 0.04; // Death Rate
+        s3.dna[12] = 0.5;  // Mutation (high)
+        s3.dna[18] = 250;  // Neighborhood Radius
+        s3.dna[26] = 0.1;  // Inertia (low)
+        s3.dna[28] = 60;   // Max Velocity (very fast)
+        s3.dna[36] = 0.7;  // Predation Bias
+        s3.dna[39] = 0.8;  // Heat Output
+        s3.dna[41] = -0.5; // Species Affinity (hostile)
+        s3.rgb = [0.6, 0, 1];
+        s3.color = "rgb(153, 0, 255)";
         specs.push(s3);
+
+        // Species 4: Terra (Green) - Reproducer, adaptive, ecosystem builder
+        const s4 = this.createSpecies();
+        s4.name = "Terra";
+        s4.dna[0] = 0.15;  // Force (weak attraction)
+        s4.dna[1] = 0.94;  // Viscosity
+        s4.dna[5] = 0.6;   // Alpha
+        s4.dna[6] = 0.5;   // Symmetry
+        s4.dna[8] = 0.6;   // Stiffness
+        s4.dna[10] = 0.15; // Birth Rate (high)
+        s4.dna[11] = 0.02; // Death Rate (low)
+        s4.dna[13] = 0.5;  // Signal Resp
+        s4.dna[18] = 180;  // Neighborhood Radius
+        s4.dna[28] = 20;   // Max Velocity (slow)
+        s4.dna[29] = 1.2;  // Base Radius
+        s4.dna[34] = 0.6;  // Energy Efficiency
+        s4.dna[35] = 0.3;  // Sex Chance
+        s4.dna[41] = 0.6;  // Species Affinity (friendly)
+        s4.rgb = [0.2, 0.8, 0.2];
+        s4.color = "rgb(51, 204, 51)";
+        specs.push(s4);
 
         return specs;
     }
